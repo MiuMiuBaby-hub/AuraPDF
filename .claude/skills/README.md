@@ -1,15 +1,16 @@
-# SmartGantt - Claude Code Skills
+# AuraPDF - Claude Code Skills
 
-> 為 SmartGantt 專案打造的可重複使用自動化 Skills
+> 為 AuraPDF 專案打造的可重複使用自動化 Skills
 
 ## 📚 Skills 總覽
 
-SmartGantt 專案包含以下 Claude Code Skills，用於自動化常見的開發工作流程：
+AuraPDF 專案包含以下 Claude Code Skills，用於自動化常見的開發工作流程：
 
 | Skill | 描述 | 版本 | 文件 |
 |-------|------|------|------|
 | **organize-docs** | 組織專案文件和腳本到結構化目錄 | v1.0 | [README](./organize-docs/README.md) |
 | **release-workflow** | 完整的版本發布流程自動化（6 階段） | v1.0 | [README](./release-workflow/README.md) |
+| **github-setup** | GitHub 專案設定、分支管理與 CI/CD 配置 | v1.0 | [README](./github-setup/README.md) |
 
 ---
 
@@ -92,6 +93,39 @@ scripts/
 - [6 階段 SOP](./release-workflow/WORKFLOW.md)
 - [範本集合](./release-workflow/TEMPLATES.md)
 - [檢查清單](./release-workflow/CHECKLIST.md)
+
+---
+
+### Skill 3: github-setup
+
+**何時使用**：當你需要設定 GitHub 專案、重新命名分支、或配置 CI/CD 自動部署時
+
+**觸發方式**：
+```
+「幫我設定 GitHub」
+「master 改 main」
+「設定 CI/CD 自動部署」
+「設定 Firebase 部署」
+```
+
+**功能**：
+- 分支重新命名（master → main）
+- GitHub Actions CI/CD 設定
+- Firebase Hosting 整合
+- GitHub Secrets 設定指引
+- 部署驗證
+
+**流程**：
+1. **Phase 1**: 前置檢查 - 確認 Git 狀態、遠端設定
+2. **Phase 2**: 分支處理 - 提交變更、重新命名分支
+3. **Phase 3**: 推送設定 - 推送新分支、設定預設分支
+4. **Phase 4**: Secrets 設定 - 指引設定 GitHub Secrets
+5. **Phase 5**: 驗證 - 確認 CI/CD 運作正常
+
+**參考文件**：
+- [使用說明](./github-setup/README.md)
+- [完整流程 SOP](./github-setup/WORKFLOW.md)
+- [Skill 定義](./github-setup/SKILL.md)
 
 ---
 
@@ -217,6 +251,15 @@ Skills 會自動使用 TodoWrite 建立任務清單：
 
 ## 📊 Skills 版本歷史
 
+### v1.1.0 (2026-01-25)
+
+**新增 Skills**：
+- ✨ `github-setup` - GitHub 專案設定與 CI/CD 配置自動化
+
+**基於**：
+- AuraPDF 專案的 GitHub 設定經驗
+- 分支管理與 Firebase Hosting 整合實踐
+
 ### v1.0.0 (2026-01-01)
 
 **新增 Skills**：
@@ -224,7 +267,7 @@ Skills 會自動使用 TodoWrite 建立任務清單：
 - ✨ `release-workflow` - 版本發布流程自動化
 
 **設計原則**：
-- 基於 SmartGantt 實際開發經驗
+- 基於實際開發經驗
 - 遵循 Claude Code Skills 規範
 - 可重複使用、易於維護
 - 完整的文件和範例
@@ -281,7 +324,7 @@ Skills 會自動使用 TodoWrite 建立任務清單：
 
 ---
 
-**維護者**：Claude Sonnet 4.5
-**最後更新**：2026-01-02
-**Skills 版本**：v1.0.0
-**專案**：SmartGantt (TriageHR)
+**維護者**：Claude Opus 4.5
+**最後更新**：2026-01-25
+**Skills 版本**：v1.1.0
+**專案**：AuraPDF
