@@ -90,7 +90,7 @@ export async function processPdfWithLogos(
         if (pageIndex < 0 || pageIndex >= pages.length) continue;
 
         const page = pages[pageIndex];
-        const { width: pageWidth, height: pageHeight } = page.getSize();
+        const { height: pageHeight } = page.getSize();
 
         // Get position (use manual position if set, otherwise detection result)
         const position = processedPage.manualPosition || processedPage.detection.position;
@@ -125,7 +125,7 @@ export function downloadPdf(
     const newFileName = `${baseName}_with_logo.pdf`;
 
     // Create blob and download
-    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+    const blob = new Blob([new Uint8Array(pdfBytes)], { type: 'application/pdf' });
     const url = URL.createObjectURL(blob);
 
     const link = document.createElement('a');

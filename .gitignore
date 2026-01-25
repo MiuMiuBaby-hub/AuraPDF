@@ -30,3 +30,13 @@ nul
 
 # Claude plans (local only)
 .claude/plans/
+
+# Firebase
+.firebase/
+*-debug.log
+.firebaserc
+
+# Service account keys (NEVER commit these!)
+*serviceAccountKey*.json
+*firebase-adminsdk*.json
+*.pem
