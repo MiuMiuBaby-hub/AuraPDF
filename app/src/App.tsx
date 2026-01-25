@@ -7,6 +7,7 @@ import type { AppStep, ProcessedPage, LogoPosition, PositionName } from './types
 // Components
 import { Header } from './components/Layout/Header';
 import { Stepper } from './components/Layout/Stepper';
+import { DisclaimerModal } from './components/Disclaimer/DisclaimerModal';
 import { PdfUploader } from './components/FileUpload/PdfUploader';
 import { LogoUploader } from './components/FileUpload/LogoUploader';
 import { LogoSettings } from './components/Settings/LogoSettings';
@@ -20,6 +21,13 @@ import { detectLogoPosition, calculateLogoDimensions, getImageDimensions } from 
 import { processPdfWithLogos, downloadPdf } from './utils/pdfProcessor';
 
 function App() {
+  // Disclaimer state - must agree each time
+  const [hasAgreedToDisclaimer, setHasAgreedToDisclaimer] = useState(false);
+
+  const handleDisclaimerAgree = useCallback(() => {
+    setHasAgreedToDisclaimer(true);
+  }, []);
+
   // Current step
   const [currentStep, setCurrentStep] = useState<AppStep>('upload');
 
@@ -289,10 +297,18 @@ function App() {
 
   return (
     <div className="min-h-screen">
-      <Header />
-      <Stepper currentStep={currentStep} />
+      {/* Disclaimer Modal */}
+      {!hasAgreedToDisclaimer && (
+        <DisclaimerModal onAgree={handleDisclaimerAgree} />
+      )}
 
-      <main className="max-w-6xl mx-auto px-4 pb-12">
+      {/* Main content - only show after agreement */}
+      {hasAgreedToDisclaimer && (
+        <>
+          <Header />
+          <Stepper currentStep={currentStep} />
+
+          <main className="max-w-6xl mx-auto px-4 pb-12">
         {/* Step 1: Upload */}
         {currentStep === 'upload' && (
           <div className="space-y-6">
@@ -445,17 +461,19 @@ function App() {
         )}
       </main>
 
-      {/* Page Editor Modal */}
-      {selectedPageData && logoPreviewUrl && (
-        <PageEditor
-          page={selectedPageData}
-          logoPreviewUrl={logoPreviewUrl}
-          onPositionChange={(pos) => handlePositionChange(selectedPageData.pageNumber, pos)}
-          onSkipPage={() => handleSkipPage(selectedPageData.pageNumber)}
-          onResetPosition={() => handleResetPosition(selectedPageData.pageNumber)}
-          onApplyToAll={() => handleApplyToAll(selectedPageData.pageNumber)}
-          onClose={() => setSelectedPage(null)}
-        />
+          {/* Page Editor Modal */}
+          {selectedPageData && logoPreviewUrl && (
+            <PageEditor
+              page={selectedPageData}
+              logoPreviewUrl={logoPreviewUrl}
+              onPositionChange={(pos) => handlePositionChange(selectedPageData.pageNumber, pos)}
+              onSkipPage={() => handleSkipPage(selectedPageData.pageNumber)}
+              onResetPosition={() => handleResetPosition(selectedPageData.pageNumber)}
+              onApplyToAll={() => handleApplyToAll(selectedPageData.pageNumber)}
+              onClose={() => setSelectedPage(null)}
+            />
+          )}
+        </>
       )}
     </div>
   );
