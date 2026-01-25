@@ -1,12 +1,46 @@
 import type { PositionConfig, PositionName, DetectionResult, LogoPosition } from '../types';
 
-// Position priority order (as specified in PRD)
-export const POSITION_PRIORITY: PositionConfig[] = [
-    { name: 'right-bottom', xRatio: 0.75, yRatio: 0.85 },
-    { name: 'right-top', xRatio: 0.75, yRatio: 0.05 },
-    { name: 'left-bottom', xRatio: 0.05, yRatio: 0.85 },
-    { name: 'left-top', xRatio: 0.05, yRatio: 0.05 },
+// All available positions with their coordinates
+export const ALL_POSITIONS: PositionConfig[] = [
+    // Corners
+    { name: 'right-bottom', xRatio: 0.85, yRatio: 0.90 },
+    { name: 'right-top', xRatio: 0.85, yRatio: 0.10 },
+    { name: 'left-bottom', xRatio: 0.15, yRatio: 0.90 },
+    { name: 'left-top', xRatio: 0.15, yRatio: 0.10 },
+    // Center
+    { name: 'center', xRatio: 0.50, yRatio: 0.50 },
+    // Edge centers
+    { name: 'top-center', xRatio: 0.50, yRatio: 0.10 },
+    { name: 'bottom-center', xRatio: 0.50, yRatio: 0.90 },
+    { name: 'left-center', xRatio: 0.15, yRatio: 0.50 },
+    { name: 'right-center', xRatio: 0.85, yRatio: 0.50 },
 ];
+
+// Default position priority order (as specified in PRD)
+export const POSITION_PRIORITY: PositionConfig[] = [
+    ALL_POSITIONS[0], // right-bottom
+    ALL_POSITIONS[1], // right-top
+    ALL_POSITIONS[2], // left-bottom
+    ALL_POSITIONS[3], // left-top
+];
+
+// Get position config by name
+export function getPositionConfig(name: PositionName): PositionConfig {
+    return ALL_POSITIONS.find(p => p.name === name) || ALL_POSITIONS[0];
+}
+
+// Position display names (Chinese)
+export const POSITION_LABELS: Record<PositionName, string> = {
+    'right-bottom': '右下角',
+    'right-top': '右上角',
+    'left-bottom': '左下角',
+    'left-top': '左上角',
+    'center': '中央',
+    'top-center': '上方中間',
+    'bottom-center': '下方中間',
+    'left-center': '左側中間',
+    'right-center': '右側中間',
+};
 
 // Margin around logo (in pixels at render scale)
 const LOGO_MARGIN = 15;

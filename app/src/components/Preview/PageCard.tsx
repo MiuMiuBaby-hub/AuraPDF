@@ -4,6 +4,8 @@ import type { ProcessedPage } from '../../types';
 interface PageCardProps {
     page: ProcessedPage;
     logoPreviewUrl: string;
+    logoOpacity: number;
+    logoSize: number;
     onClick: () => void;
     isSelected?: boolean;
 }
@@ -11,10 +13,20 @@ interface PageCardProps {
 export function PageCard({
     page,
     logoPreviewUrl,
+    logoOpacity,
+    logoSize,
     onClick,
     isSelected = false,
 }: PageCardProps) {
     const { detection, skipLogo } = page;
+
+    // 使用每頁設定或全局設定
+    const effectiveOpacity = page.logoOpacity ?? logoOpacity;
+    const effectiveSize = page.logoSize ?? logoSize;
+    const hasCustomSettings = page.logoSize !== undefined || page.logoOpacity !== undefined;
+
+    // Calculate size scale ratio for per-page logo size
+    const sizeRatio = effectiveSize / logoSize;
 
     // Determine status color and icon
     const getStatusInfo = () => {
@@ -55,11 +67,15 @@ export function PageCard({
     const canvasWidth = page.canvas.width;
     const canvasHeight = page.canvas.height;
 
+    // Apply per-page size scaling
+    const scaledWidth = position.width * sizeRatio;
+    const scaledHeight = position.height * sizeRatio;
+
     const logoStyle = {
         left: `${(position.x / canvasWidth) * 100}%`,
         top: `${(position.y / canvasHeight) * 100}%`,
-        width: `${(position.width / canvasWidth) * 100}%`,
-        height: `${(position.height / canvasHeight) * 100}%`,
+        width: `${(scaledWidth / canvasWidth) * 100}%`,
+        height: `${(scaledHeight / canvasHeight) * 100}%`,
     };
 
     return (
@@ -89,7 +105,8 @@ export function PageCard({
                         <img
                             src={logoPreviewUrl}
                             alt="Logo"
-                            className="w-full h-full object-contain opacity-90"
+                            className="w-full h-full object-contain"
+                            style={{ opacity: effectiveOpacity / 100 }}
                         />
                     </div>
                 )}
@@ -98,9 +115,16 @@ export function PageCard({
             {/* Status bar */}
             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3">
                 <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-white">
-                        第 {page.pageNumber} 頁
-                    </span>
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-white">
+                            第 {page.pageNumber} 頁
+                        </span>
+                        {hasCustomSettings && (
+                            <span className="text-[10px] bg-blue-500/50 text-blue-200 px-1.5 py-0.5 rounded">
+                                自訂
+                            </span>
+                        )}
+                    </div>
 
                     <div className="flex items-center gap-1">
                         {statusInfo.icon}

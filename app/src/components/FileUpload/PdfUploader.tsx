@@ -8,6 +8,8 @@ interface PdfUploaderProps {
     error: string | null;
     onFileSelect: (file: File) => void;
     onClear: () => void;
+    multiple?: boolean;
+    onFilesSelect?: (files: File[]) => void;
 }
 
 export function PdfUploader({
@@ -17,6 +19,8 @@ export function PdfUploader({
     error,
     onFileSelect,
     onClear,
+    multiple = false,
+    onFilesSelect,
 }: PdfUploaderProps) {
     if (file && !error) {
         return (
@@ -64,10 +68,12 @@ export function PdfUploader({
         <div>
             <DropZone
                 onFileSelect={onFileSelect}
+                onFilesSelect={onFilesSelect}
                 accept=".pdf"
-                label="上傳 PDF 檔案"
-                description="支援 PDF 格式，最大 20MB，最多 100 頁"
+                label={multiple ? "上傳多個 PDF 檔案" : "上傳 PDF 檔案"}
+                description={multiple ? "可選擇多個 PDF 檔案進行批量處理" : "支援 PDF 格式，最大 20MB，最多 100 頁"}
                 icon={<FileText className="w-8 h-8 text-blue-400" />}
+                multiple={multiple}
             />
 
             {error && (

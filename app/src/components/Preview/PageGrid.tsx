@@ -4,6 +4,8 @@ import { PageCard } from './PageCard';
 interface PageGridProps {
     pages: ProcessedPage[];
     logoPreviewUrl: string;
+    logoOpacity: number;
+    logoSize: number;
     selectedPage: number | null;
     onPageSelect: (pageNumber: number) => void;
 }
@@ -11,6 +13,8 @@ interface PageGridProps {
 export function PageGrid({
     pages,
     logoPreviewUrl,
+    logoOpacity,
+    logoSize,
     selectedPage,
     onPageSelect,
 }: PageGridProps) {
@@ -21,6 +25,8 @@ export function PageGrid({
                     key={page.pageNumber}
                     page={page}
                     logoPreviewUrl={logoPreviewUrl}
+                    logoOpacity={logoOpacity}
+                    logoSize={logoSize}
                     onClick={() => onPageSelect(page.pageNumber)}
                     isSelected={selectedPage === page.pageNumber}
                 />

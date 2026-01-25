@@ -3,20 +3,24 @@ import { Upload } from 'lucide-react';
 
 interface DropZoneProps {
     onFileSelect: (file: File) => void;
+    onFilesSelect?: (files: File[]) => void;
     accept: string;
     label: string;
     description: string;
     icon?: React.ReactNode;
     disabled?: boolean;
+    multiple?: boolean;
 }
 
 export function DropZone({
     onFileSelect,
+    onFilesSelect,
     accept,
     label,
     description,
     icon,
     disabled = false,
+    multiple = false,
 }: DropZoneProps) {
     const [isDragging, setIsDragging] = useState(false);
 
@@ -43,18 +47,26 @@ export function DropZone({
 
         const files = e.dataTransfer.files;
         if (files.length > 0) {
-            onFileSelect(files[0]);
+            if (multiple && onFilesSelect) {
+                onFilesSelect(Array.from(files));
+            } else {
+                onFileSelect(files[0]);
+            }
         }
-    }, [disabled, onFileSelect]);
+    }, [disabled, onFileSelect, onFilesSelect, multiple]);
 
     const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
         if (files && files.length > 0) {
-            onFileSelect(files[0]);
+            if (multiple && onFilesSelect) {
+                onFilesSelect(Array.from(files));
+            } else {
+                onFileSelect(files[0]);
+            }
         }
         // Reset input value to allow re-selecting the same file
         e.target.value = '';
-    }, [onFileSelect]);
+    }, [onFileSelect, onFilesSelect, multiple]);
 
     return (
         <div
@@ -76,6 +88,7 @@ export function DropZone({
                 onChange={handleFileInput}
                 className="hidden"
                 disabled={disabled}
+                multiple={multiple}
             />
 
             <div className="flex flex-col items-center gap-4">

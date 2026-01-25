@@ -1,12 +1,15 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { X, Move, SkipForward, RotateCcw, Copy } from 'lucide-react';
+import { X, Move, SkipForward, RotateCcw, Copy, Settings } from 'lucide-react';
 import type { ProcessedPage, LogoPosition } from '../../types';
 import { constrainPosition } from '../../utils/blankDetection';
 
 interface PageEditorProps {
     page: ProcessedPage;
     logoPreviewUrl: string;
+    logoOpacity: number;
+    logoSize: number;
     onPositionChange: (position: LogoPosition) => void;
+    onPageSettingsChange: (settings: { logoSize?: number; logoOpacity?: number }) => void;
     onSkipPage: () => void;
     onResetPosition: () => void;
     onApplyToAll: () => void;
@@ -16,12 +19,23 @@ interface PageEditorProps {
 export function PageEditor({
     page,
     logoPreviewUrl,
+    logoOpacity,
+    logoSize,
     onPositionChange,
+    onPageSettingsChange,
     onSkipPage,
     onResetPosition,
     onApplyToAll,
     onClose,
 }: PageEditorProps) {
+    // 使用每頁設定或全局設定
+    const effectiveOpacity = page.logoOpacity ?? logoOpacity;
+    const effectiveSize = page.logoSize ?? logoSize;
+    const hasCustomSettings = page.logoSize !== undefined || page.logoOpacity !== undefined;
+
+    // Calculate size scale ratio for per-page logo size
+    const sizeRatio = effectiveSize / logoSize;
+
     const containerRef = useRef<HTMLDivElement>(null);
     const [isDragging, setIsDragging] = useState(false);
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -81,11 +95,15 @@ export function PageEditor({
         }
     }, [isDragging, handleMouseMove, handleMouseUp]);
 
+    // Apply per-page size scaling
+    const scaledWidth = position.width * sizeRatio;
+    const scaledHeight = position.height * sizeRatio;
+
     const logoStyle = {
         left: `${(position.x / canvasWidth) * 100}%`,
         top: `${(position.y / canvasHeight) * 100}%`,
-        width: `${(position.width / canvasWidth) * 100}%`,
-        height: `${(position.height / canvasHeight) * 100}%`,
+        width: `${(scaledWidth / canvasWidth) * 100}%`,
+        height: `${(scaledHeight / canvasHeight) * 100}%`,
     };
 
     return (
@@ -130,6 +148,7 @@ export function PageEditor({
                                     src={logoPreviewUrl}
                                     alt="Logo"
                                     className="w-full h-full object-contain pointer-events-none"
+                                    style={{ opacity: effectiveOpacity / 100 }}
                                     draggable={false}
                                 />
 
@@ -148,6 +167,90 @@ export function PageEditor({
                         </div>
                     )}
                 </div>
+
+                {/* Per-page settings panel */}
+                {!page.skipLogo && (
+                    <div className="mx-4 mb-4 p-4 bg-white/5 rounded-xl border border-white/10">
+                        <div className="flex items-center gap-2 mb-4">
+                            <Settings className="w-4 h-4 text-blue-400" />
+                            <h4 className="text-sm font-semibold text-white">此頁 Logo 設定</h4>
+                            {hasCustomSettings && (
+                                <span className="text-xs bg-blue-500/30 text-blue-300 px-2 py-0.5 rounded">
+                                    自訂
+                                </span>
+                            )}
+                        </div>
+
+                        <div className="grid md:grid-cols-2 gap-4">
+                            {/* Logo Size Slider */}
+                            <div>
+                                <div className="flex justify-between items-center mb-2">
+                                    <label className="text-xs text-gray-400">Logo 大小</label>
+                                    <span className="text-xs font-mono text-blue-400">
+                                        {effectiveSize}px
+                                        {page.logoSize === undefined && (
+                                            <span className="text-gray-500 ml-1">(全局)</span>
+                                        )}
+                                    </span>
+                                </div>
+                                <input
+                                    type="range"
+                                    min="40"
+                                    max="150"
+                                    value={effectiveSize}
+                                    onChange={(e) => onPageSettingsChange({
+                                        logoSize: parseInt(e.target.value),
+                                        logoOpacity: page.logoOpacity
+                                    })}
+                                    className="w-full"
+                                />
+                                <div className="flex justify-between text-xs text-gray-600 mt-1">
+                                    <span>40px</span>
+                                    <span>150px</span>
+                                </div>
+                            </div>
+
+                            {/* Logo Opacity Slider */}
+                            <div>
+                                <div className="flex justify-between items-center mb-2">
+                                    <label className="text-xs text-gray-400">Logo 透明度</label>
+                                    <span className="text-xs font-mono text-blue-400">
+                                        {effectiveOpacity}%
+                                        {page.logoOpacity === undefined && (
+                                            <span className="text-gray-500 ml-1">(全局)</span>
+                                        )}
+                                    </span>
+                                </div>
+                                <input
+                                    type="range"
+                                    min="10"
+                                    max="100"
+                                    step="5"
+                                    value={effectiveOpacity}
+                                    onChange={(e) => onPageSettingsChange({
+                                        logoSize: page.logoSize,
+                                        logoOpacity: parseInt(e.target.value)
+                                    })}
+                                    className="w-full"
+                                />
+                                <div className="flex justify-between text-xs text-gray-600 mt-1">
+                                    <span>淡</span>
+                                    <span>深</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Reset to global settings button */}
+                        {hasCustomSettings && (
+                            <button
+                                onClick={() => onPageSettingsChange({ logoSize: undefined, logoOpacity: undefined })}
+                                className="mt-3 text-xs px-3 py-1.5 bg-gray-600 hover:bg-gray-500 rounded-lg transition-colors w-full"
+                            >
+                                重置為全局設定
+                            </button>
+                        )}
+                    </div>
+                )}
 
                 {/* Actions */}
                 <div className="flex flex-wrap items-center justify-between gap-3 p-4 border-t border-white/10">

@@ -27,7 +27,12 @@ export type PositionName =
     | 'right-bottom'
     | 'right-top'
     | 'left-bottom'
-    | 'left-top';
+    | 'left-top'
+    | 'center'
+    | 'top-center'
+    | 'bottom-center'
+    | 'left-center'
+    | 'right-center';
 
 // Page with detection result
 export interface ProcessedPage {
@@ -37,6 +42,8 @@ export interface ProcessedPage {
     canvas: HTMLCanvasElement;
     manualPosition?: LogoPosition;
     skipLogo?: boolean;
+    logoSize?: number;      // 每頁獨立大小 (undefined = 使用全局)
+    logoOpacity?: number;   // 每頁獨立透明度 (undefined = 使用全局)
 }
 
 // App state steps
@@ -68,4 +75,58 @@ export interface PositionConfig {
 export interface ValidationResult {
     valid: boolean;
     error?: string;
+}
+
+// Pricing configuration
+export interface PricingConfig {
+    perPage: number;        // Cost per page in USD
+    perFile: number;        // Base cost per file in USD
+    currency: 'USD' | 'TWD';
+}
+
+// Single session cost estimate
+export interface CostEstimate {
+    pageCount: number;
+    pageCost: number;
+    fileCost: number;
+    totalCost: number;
+}
+
+// Cumulative usage statistics
+export interface UsageStats {
+    totalPagesProcessed: number;
+    totalFilesProcessed: number;
+    totalCostAccumulated: number;
+    firstUsedAt: string;
+    lastUsedAt: string;
+    sessionCount: number;
+}
+
+// Batch processing types
+export type BatchFileStatus =
+    | 'pending'      // 等待處理
+    | 'validating'   // 驗證中
+    | 'analyzing'    // 分析頁面中
+    | 'ready'        // 分析完成，等待下載
+    | 'processing'   // 嵌入 Logo 中
+    | 'completed'    // 處理完成
+    | 'error';       // 處理失敗
+
+// 批量處理中的單一檔案
+export interface BatchFile {
+    id: string;                      // crypto.randomUUID()
+    file: File;
+    status: BatchFileStatus;
+    error?: string;                  // 錯誤訊息
+    pageCount?: number;              // 驗證後取得的頁數
+    processedPages?: ProcessedPage[]; // 分析結果
+    resultBytes?: Uint8Array;        // 處理後的 PDF bytes
+}
+
+// 批量處理進度
+export interface BatchProgress {
+    currentFileIndex: number;        // 0-based index
+    currentFileName: string;
+    phase: 'validating' | 'analyzing' | 'processing' | 'zipping';
+    overallProgress: number;         // 0-100
 }
