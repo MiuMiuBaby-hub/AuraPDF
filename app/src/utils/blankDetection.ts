@@ -92,7 +92,7 @@ function analyzePixelArea(
     const lightRatio = (whitePixels + lightPixels) / totalPixels;
 
     if (whiteRatio > 0.95) return 'blank';
-    if (lightRatio > 0.90) return 'light';
+    if (lightRatio > 0.85) return 'light';  // 調嚴：90% → 85%
     return 'occupied';
 }
 
@@ -101,7 +101,9 @@ export function detectLogoPosition(
     canvas: HTMLCanvasElement,
     logoWidth: number,
     logoHeight: number,
-    preferredPosition?: PositionName
+    preferredPosition?: PositionName,
+    autoFallback?: boolean,
+    fallbackPriority?: PositionName[]
 ): DetectionResult {
     const ctx = canvas.getContext('2d');
     if (!ctx) {
@@ -137,10 +139,43 @@ export function detectLogoPosition(
         };
     };
 
-    // If user specified a preferred position, ALWAYS use it (don't override with auto-detection)
+    // If user specified a preferred position, use it (with optional fallback)
     if (preferredPosition) {
         const preferredConfig = getPositionConfig(preferredPosition);
         const { position, status } = calculatePosition(preferredConfig);
+
+        // 若開啟自動遞補，且指定位置非空白，依 fallbackPriority 順序嘗試其他位置
+        if (autoFallback && status !== 'blank' && fallbackPriority) {
+            // 第一輪：只找完全空白的位置
+            for (const posName of fallbackPriority) {
+                if (posName === preferredPosition) continue;
+                const posConfig = getPositionConfig(posName);
+                const alt = calculatePosition(posConfig);
+                if (alt.status === 'blank') {
+                    return {
+                        pageNumber: 0,
+                        position: alt.position,
+                        status: alt.status,
+                        positionName: posName,
+                    };
+                }
+            }
+            // 第二輪：若無空白，放寬接受 light
+            for (const posName of fallbackPriority) {
+                if (posName === preferredPosition) continue;
+                const posConfig = getPositionConfig(posName);
+                const alt = calculatePosition(posConfig);
+                if (alt.status === 'light') {
+                    return {
+                        pageNumber: 0,
+                        position: alt.position,
+                        status: alt.status,
+                        positionName: posName,
+                    };
+                }
+            }
+        }
+
         return {
             pageNumber: 0,
             position,
@@ -149,11 +184,23 @@ export function detectLogoPosition(
         };
     }
 
-    // No preferred position: use automatic detection to find the best blank/light area
+    // No preferred position: use automatic detection
+    // 第一輪：只找完全空白的位置
     for (const pos of POSITION_PRIORITY) {
         const { position, status } = calculatePosition(pos);
-
-        if (status === 'blank' || status === 'light') {
+        if (status === 'blank') {
+            return {
+                pageNumber: 0,
+                position,
+                status,
+                positionName: pos.name,
+            };
+        }
+    }
+    // 第二輪：若無空白，放寬接受 light
+    for (const pos of POSITION_PRIORITY) {
+        const { position, status } = calculatePosition(pos);
+        if (status === 'light') {
             return {
                 pageNumber: 0,
                 position,

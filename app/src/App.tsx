@@ -66,14 +66,16 @@ function App() {
   const [preferredPosition, setPreferredPosition] = useState<PositionName>(() => loadSettings().preferredPosition);
   const [autoSize, setAutoSize] = useState(() => loadSettings().autoSize);
   const [autoSizePercent, setAutoSizePercent] = useState(() => loadSettings().autoSizePercent);
+  const [autoFallback, setAutoFallback] = useState(() => loadSettings().autoFallback);
+  const [fallbackPriority, setFallbackPriority] = useState<PositionName[]>(() => loadSettings().fallbackPriority);
 
   // Security settings - NOT persisted to localStorage for security reasons
   const [securitySettings, setSecuritySettings] = useState<SecuritySettingsType>(() => ({ ...DEFAULT_SECURITY_SETTINGS }));
 
   // Save settings to localStorage when they change
   useEffect(() => {
-    saveSettings({ logoSize, logoOpacity, preferredPosition, autoSize, autoSizePercent });
-  }, [logoSize, logoOpacity, preferredPosition, autoSize, autoSizePercent]);
+    saveSettings({ logoSize, logoOpacity, preferredPosition, autoSize, autoSizePercent, autoFallback, fallbackPriority });
+  }, [logoSize, logoOpacity, preferredPosition, autoSize, autoSizePercent, autoFallback, fallbackPriority]);
 
   // Processing state
   const [isProcessing, setIsProcessing] = useState(false);
@@ -310,7 +312,9 @@ function App() {
           canvas,
           logoDims.width,
           logoDims.height,
-          preferredPosition
+          preferredPosition,
+          autoFallback,
+          fallbackPriority
         );
         detection.pageNumber = i;
 
@@ -343,7 +347,7 @@ function App() {
     } finally {
       setIsProcessing(false);
     }
-  }, [pdfBytes, activeLogo, logoSize, preferredPosition, autoSize, autoSizePercent]);
+  }, [pdfBytes, activeLogo, logoSize, preferredPosition, autoSize, autoSizePercent, autoFallback, fallbackPriority]);
 
   // Handle position change in editor
   const handlePositionChange = useCallback((pageNumber: number, position: LogoPosition) => {
@@ -539,7 +543,9 @@ function App() {
             canvas,
             logoDims.width,
             logoDims.height,
-            preferredPosition
+            preferredPosition,
+            autoFallback,
+            fallbackPriority
           );
           detection.pageNumber = p;
 
@@ -566,7 +572,7 @@ function App() {
     setIsBatchProcessing(false);
     setBatchProgress(null);
     setCurrentStep('preview');
-  }, [activeLogo, batchFiles, logoSize, preferredPosition, autoSize, autoSizePercent]);
+  }, [activeLogo, batchFiles, logoSize, preferredPosition, autoSize, autoSizePercent, autoFallback, fallbackPriority]);
 
   // Handle batch download
   const handleBatchDownload = useCallback(async () => {
@@ -667,13 +673,9 @@ function App() {
           <Header />
           <Stepper currentStep={currentStep} />
 
-          <div className="flex flex-col lg:flex-row max-w-[1400px] mx-auto px-4 pb-12 gap-6">
-          <main className="flex-1 min-w-0 order-2 lg:order-1">
-        {/* Step 1: Upload */}
-        {currentStep === 'upload' && (
-          <div className="space-y-6">
-            {/* Mode toggle */}
-            <div className="flex justify-center">
+          {/* Mode toggle — above the two-column layout */}
+          {currentStep === 'upload' && (
+            <div className="flex justify-center max-w-[1400px] mx-auto px-4 mb-6">
               <div className="inline-flex rounded-lg bg-gray-800 p-1">
                 <button
                   onClick={() => { setIsBatchMode(false); setBatchFiles([]); }}
@@ -695,7 +697,13 @@ function App() {
                 </button>
               </div>
             </div>
+          )}
 
+          <div className="flex flex-col lg:flex-row max-w-[1400px] mx-auto px-4 pb-12 gap-6">
+          <main className="flex-1 min-w-0 order-2 lg:order-1">
+        {/* Step 1: Upload */}
+        {currentStep === 'upload' && (
+          <div className="space-y-6">
             {!isBatchMode ? (
               <PdfUploader
                 file={pdfFile}
@@ -748,6 +756,10 @@ function App() {
                   onPositionChange={setPreferredPosition}
                   onAutoSizeChange={setAutoSize}
                   onAutoSizePercentChange={setAutoSizePercent}
+                  autoFallback={autoFallback}
+                  onAutoFallbackChange={setAutoFallback}
+                  fallbackPriority={fallbackPriority}
+                  onFallbackPriorityChange={setFallbackPriority}
                   logoPreviewUrl={logoPreviewUrl}
                 />
                 <SecuritySettings

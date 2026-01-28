@@ -115,6 +115,31 @@
 | v1.1 | PDF 安全性 / 密碼保護 | 2026-01-27 |
 | v1.1 | Logo Panel（多 Logo 管理面板） | 2026-01-28 |
 | v1.1 | 旋轉 PDF 頁面 Logo 嵌入修正 | 2026-01-28 |
+| v1.2 | 自動遞補機制 + 兩階段偵測演算法 | 2026-01-28 |
+
+---
+
+## 開發紀錄
+
+### v1.2 — 自動遞補與偵測優化 (2026-01-28)
+
+**新增功能：**
+- `autoFallback` 開關：當指定位置被佔用時自動嘗試其他位置
+- `fallbackPriority` 可拖曳排序：9 宮格位置優先順序自訂
+- Logo 設定面板改為三欄並排（大小｜透明度｜預設位置），高度縮減 1/3
+
+**偵測演算法改進：**
+- 兩階段搜尋策略：
+  1. **第一輪**：只找完全空白位置（`blank`，95%+ 純白像素）
+  2. **第二輪**：若無空白，才放寬接受淺色區域（`light`，85%+ 淺色像素）
+- 解決工程圖類文件（含浮水印、標題欄）Logo 誤放問題
+
+**修改檔案：**
+- `settingsStorage.ts`：新增 `autoFallback`、`fallbackPriority` 欄位
+- `blankDetection.ts`：實作兩階段偵測邏輯
+- `PositionSelector.tsx`：HTML5 drag-and-drop 拖曳排序
+- `LogoSettings.tsx`：三欄式 UI 配置
+- `App.tsx`：Props 鏈整合
 
 ---
 

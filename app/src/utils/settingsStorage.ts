@@ -7,7 +7,23 @@ export interface UserSettings {
     preferredPosition: PositionName;
     autoSize: boolean;           // 是否啟用自適應大小
     autoSizePercent: number;     // 自適應大小百分比 (3-15%)
+    autoFallback: boolean;       // 佔用時自動遞補位置
+    fallbackPriority: PositionName[];  // 遞補順序優先級
 }
+
+// 預設遞補順序：由上而下、由左至右
+// 數字 = 優先順序，1 最高，9 最低
+export const DEFAULT_FALLBACK_PRIORITY: PositionName[] = [
+    'right-bottom',    // 1
+    'right-center',    // 2
+    'bottom-center',   // 3
+    'right-top',       // 4
+    'center',          // 5
+    'left-bottom',     // 6
+    'top-center',      // 7
+    'left-center',     // 8
+    'left-top',        // 9
+];
 
 // Default settings
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -16,6 +32,8 @@ export const DEFAULT_SETTINGS: UserSettings = {
     preferredPosition: 'right-bottom',
     autoSize: false,
     autoSizePercent: 8,
+    autoFallback: false,
+    fallbackPriority: DEFAULT_FALLBACK_PRIORITY,
 };
 
 // Default security settings
@@ -51,6 +69,8 @@ export function loadSettings(): UserSettings {
             preferredPosition: validatePosition(parsed.preferredPosition) ? parsed.preferredPosition : DEFAULT_SETTINGS.preferredPosition,
             autoSize: typeof parsed.autoSize === 'boolean' ? parsed.autoSize : DEFAULT_SETTINGS.autoSize,
             autoSizePercent: validateAutoSizePercent(parsed.autoSizePercent) ? parsed.autoSizePercent : DEFAULT_SETTINGS.autoSizePercent,
+            autoFallback: typeof parsed.autoFallback === 'boolean' ? parsed.autoFallback : DEFAULT_SETTINGS.autoFallback,
+            fallbackPriority: validateFallbackPriority(parsed.fallbackPriority) ? parsed.fallbackPriority : DEFAULT_SETTINGS.fallbackPriority,
         };
     } catch {
         return { ...DEFAULT_SETTINGS };
@@ -97,4 +117,15 @@ function validatePosition(value: unknown): value is PositionName {
 
 function validateAutoSizePercent(value: unknown): value is number {
     return typeof value === 'number' && value >= 3 && value <= 15;
+}
+
+function validateFallbackPriority(value: unknown): value is PositionName[] {
+    if (!Array.isArray(value)) return false;
+    if (value.length !== 9) return false;
+    const validPositions: PositionName[] = [
+        'right-bottom', 'right-top', 'left-bottom', 'left-top',
+        'center', 'top-center', 'bottom-center', 'left-center', 'right-center'
+    ];
+    return value.every(v => validPositions.includes(v as PositionName)) &&
+           new Set(value).size === 9;
 }
