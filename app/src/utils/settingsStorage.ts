@@ -1,4 +1,4 @@
-import type { PositionName } from '../types';
+import type { PositionName, SecuritySettings } from '../types';
 
 // Settings that can be persisted
 export interface UserSettings {
@@ -16,6 +16,20 @@ export const DEFAULT_SETTINGS: UserSettings = {
     preferredPosition: 'right-bottom',
     autoSize: false,
     autoSizePercent: 8,
+};
+
+// Default security settings
+// Note: Passwords are NOT persisted to localStorage for security reasons
+export const DEFAULT_SECURITY_SETTINGS: SecuritySettings = {
+    enabled: false,
+    userPassword: '',
+    ownerPassword: '',
+    permissions: {
+        printing: 'highResolution',
+        copying: true,
+        modifying: true,
+        annotating: true,
+    }
 };
 
 const STORAGE_KEY = 'aurapdf_settings';

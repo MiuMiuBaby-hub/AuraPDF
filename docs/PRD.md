@@ -380,6 +380,7 @@ const positionPriority = [
 - [x] 更多位置模板選擇 ✅ (已於 v1.0 實現)
 - [x] 浮水印模式(半透明 Logo) ✅ (已於 v1.0 實現)
 - [x] 儲存常用設定檔 ✅ (已於 v1.0 實現)
+- [x] PDF 密碼保護與權限設定 ✅ (已於 v1.2 實現)
 - [ ] 支援多個 Logo 輪流使用
 
 ### 8.2 第三期功能 (v3.0)
@@ -416,6 +417,7 @@ const positionPriority = [
 - Canvas API 文件: https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API
 
 ### 10.2 版本歷史
+- v1.2 (2026-01-28): 新增 PDF 密碼保護與權限設定功能
 - v1.1 (2026-01-25): 新增批量處理功能
 - v1.0 (2026-01-25): 初版 PRD 完成
 

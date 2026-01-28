@@ -1,5 +1,5 @@
-import { PDFDocument } from 'pdf-lib';
-import type { ProcessedPage } from '../types';
+import { PDFDocument } from 'pdf-lib-plus-encrypt';
+import type { ProcessedPage, SecuritySettings } from '../types';
 import { getRenderScale } from './pdfUtils';
 
 // Apply opacity to an image using canvas
@@ -153,7 +153,8 @@ export async function processPdfWithLogos(
     logoMimeType: string,
     processedPages: ProcessedPage[],
     logoOpacity: number = 100,
-    logoDimensions?: { width: number; height: number }
+    logoDimensions?: { width: number; height: number },
+    security?: SecuritySettings
 ): Promise<Uint8Array> {
     // Load the PDF
     const pdfDoc = await PDFDocument.load(pdfBytes);
@@ -254,6 +255,24 @@ export async function processPdfWithLogos(
             y: pdfY,
             width: pdfWidth,
             height: pdfHeight,
+        });
+    }
+
+    // Apply encryption if security settings are enabled
+    if (security?.enabled && (security.userPassword || security.ownerPassword)) {
+        // pdf-lib-plus-encrypt requires userPassword, use ownerPassword as fallback
+        const userPwd = security.userPassword || security.ownerPassword || 'user';
+        const ownerPwd = security.ownerPassword || security.userPassword || 'owner';
+
+        await pdfDoc.encrypt({
+            userPassword: userPwd,
+            ownerPassword: ownerPwd,
+            permissions: {
+                printing: security.permissions.printing,
+                copying: security.permissions.copying,
+                modifying: security.permissions.modifying,
+                annotating: security.permissions.annotating,
+            }
         });
     }
 

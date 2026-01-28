@@ -9,6 +9,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- **PDF Security / Password Protection** - PDF 安全性設定
+  - 支援設定開啟密碼 (User Password)
+  - 支援設定權限密碼 (Owner Password)
+  - 權限設定：
+    - 允許/禁止列印（可選高解析度/低解析度）
+    - 允許/禁止複製文字和圖片
+    - 允許/禁止修改內容
+    - 允許/禁止新增註解
+  - 單檔和批量處理都支援加密
+  - 新增元件：
+    - `SecuritySettings.tsx` - PDF 安全性設定 UI 元件
+  - 新增型別：
+    - `SecuritySettings`, `PdfPermissions`, `PrintingPermission`
+  - 更新依賴：
+    - 將 `pdf-lib` 更換為 `pdf-lib-plus-encrypt` 以支援加密功能
+
 - **Batch Processing Mode** - 批量處理功能
   - 支援同時上傳多個 PDF 檔案
   - 單檔/批量模式切換按鈕

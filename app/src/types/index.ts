@@ -1,3 +1,22 @@
+// PDF Printing permission type
+export type PrintingPermission = 'highResolution' | 'lowResolution' | false;
+
+// PDF Permissions settings
+export interface PdfPermissions {
+    printing: PrintingPermission;   // 列印權限
+    copying: boolean;               // 複製權限
+    modifying: boolean;             // 修改權限
+    annotating: boolean;            // 註解權限
+}
+
+// PDF Security settings
+export interface SecuritySettings {
+    enabled: boolean;               // 啟用加密
+    userPassword: string;           // 開啟密碼
+    ownerPassword: string;          // 權限密碼
+    permissions: PdfPermissions;    // 權限設定
+}
+
 // PDF Page information
 export interface PageInfo {
     pageNumber: number;

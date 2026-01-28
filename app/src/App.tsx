@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { Loader2, ArrowRight, ArrowLeft, Download, CheckCircle, AlertTriangle, XCircle, Files, FileText } from 'lucide-react';
 
 // Types
-import type { AppStep, ProcessedPage, LogoPosition, PositionName, CostEstimate, UsageStats, BatchFile, BatchProgress } from './types';
+import type { AppStep, ProcessedPage, LogoPosition, PositionName, CostEstimate, UsageStats, BatchFile, BatchProgress, SecuritySettings as SecuritySettingsType } from './types';
 
 // Components
 import { Header } from './components/Layout/Header';
@@ -11,6 +11,7 @@ import { DisclaimerModal } from './components/Disclaimer/DisclaimerModal';
 import { PdfUploader } from './components/FileUpload/PdfUploader';
 import { LogoUploader } from './components/FileUpload/LogoUploader';
 import { LogoSettings } from './components/Settings/LogoSettings';
+import { SecuritySettings } from './components/Settings/SecuritySettings';
 import { PageGrid } from './components/Preview/PageGrid';
 import { PageEditor } from './components/Preview/PageEditor';
 import { CostEstimateDisplay } from './components/Usage/CostEstimate';
@@ -22,7 +23,7 @@ import { validatePdfFile, loadPdfDocument, renderPageToCanvas, getRenderScale } 
 import { validateLogoFile, createImagePreviewUrl, revokeImagePreviewUrl, getImageMimeType } from './utils/imageUtils';
 import { detectLogoPosition, calculateLogoDimensions, getImageDimensions } from './utils/blankDetection';
 import { processPdfWithLogos, downloadPdf } from './utils/pdfProcessor';
-import { loadSettings, saveSettings } from './utils/settingsStorage';
+import { loadSettings, saveSettings, DEFAULT_SECURITY_SETTINGS } from './utils/settingsStorage';
 import { loadUsageStats, recordUsage } from './utils/usageStorage';
 import { calculateCostEstimate } from './config/pricing';
 import { downloadAsZip } from './utils/zipUtils';
@@ -58,6 +59,9 @@ function App() {
   const [preferredPosition, setPreferredPosition] = useState<PositionName>(() => loadSettings().preferredPosition);
   const [autoSize, setAutoSize] = useState(() => loadSettings().autoSize);
   const [autoSizePercent, setAutoSizePercent] = useState(() => loadSettings().autoSizePercent);
+
+  // Security settings - NOT persisted to localStorage for security reasons
+  const [securitySettings, setSecuritySettings] = useState<SecuritySettingsType>(() => ({ ...DEFAULT_SECURITY_SETTINGS }));
 
   // Save settings to localStorage when they change
   useEffect(() => {
@@ -298,7 +302,8 @@ function App() {
         getImageMimeType(logoFile),
         processedPages,
         logoOpacity,
-        logoDimensions ?? undefined
+        logoDimensions ?? undefined,
+        securitySettings
       );
 
       downloadPdf(resultBytes, pdfFile.name);
@@ -318,7 +323,7 @@ function App() {
     } finally {
       setIsDownloading(false);
     }
-  }, [logoFile, pdfFile, processedPages, logoOpacity, logoSize, logoDimensions]);
+  }, [logoFile, pdfFile, processedPages, logoOpacity, logoSize, logoDimensions, securitySettings]);
 
   // Handle back
   const handleBack = useCallback(() => {
@@ -493,7 +498,8 @@ function App() {
           getImageMimeType(logoFile),
           bf.processedPages!,
           logoOpacity,
-          logoDimensions ?? undefined
+          logoDimensions ?? undefined,
+          securitySettings
         );
 
         results.push({ originalName: bf.file.name, data: resultBytes });
@@ -531,7 +537,7 @@ function App() {
     setIsBatchProcessing(false);
     setBatchProgress(null);
     setCurrentStep('download');
-  }, [logoFile, batchFiles, logoOpacity, logoDimensions]);
+  }, [logoFile, batchFiles, logoOpacity, logoDimensions, securitySettings]);
 
   // Get status counts
   const statusCounts = {
@@ -637,19 +643,25 @@ function App() {
             )}
 
             {logoFile && logoPreviewUrl && (
-              <LogoSettings
-                logoSize={logoSize}
-                logoOpacity={logoOpacity}
-                preferredPosition={preferredPosition}
-                autoSize={autoSize}
-                autoSizePercent={autoSizePercent}
-                onSizeChange={setLogoSize}
-                onOpacityChange={setLogoOpacity}
-                onPositionChange={setPreferredPosition}
-                onAutoSizeChange={setAutoSize}
-                onAutoSizePercentChange={setAutoSizePercent}
-                logoPreviewUrl={logoPreviewUrl}
-              />
+              <>
+                <LogoSettings
+                  logoSize={logoSize}
+                  logoOpacity={logoOpacity}
+                  preferredPosition={preferredPosition}
+                  autoSize={autoSize}
+                  autoSizePercent={autoSizePercent}
+                  onSizeChange={setLogoSize}
+                  onOpacityChange={setLogoOpacity}
+                  onPositionChange={setPreferredPosition}
+                  onAutoSizeChange={setAutoSize}
+                  onAutoSizePercentChange={setAutoSizePercent}
+                  logoPreviewUrl={logoPreviewUrl}
+                />
+                <SecuritySettings
+                  security={securitySettings}
+                  onSecurityChange={setSecuritySettings}
+                />
+              </>
             )}
 
             <div className="flex justify-center pt-4">
