@@ -434,11 +434,16 @@ function App() {
   // Handle back
   const handleBack = useCallback(() => {
     if (currentStep === 'preview') {
+      // 返回上傳頁時清除舊檔案狀態
+      handlePdfClear();
+      setProcessedPages([]);
+      setBatchFiles([]);
+      setIsBatchMode(false);
       setCurrentStep('upload');
     } else if (currentStep === 'download') {
       setCurrentStep('preview');
     }
-  }, [currentStep]);
+  }, [currentStep, handlePdfClear]);
 
   // Handle start over - logos persist, only clear PDF state
   const handleStartOver = useCallback(() => {
