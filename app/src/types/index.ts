@@ -121,6 +121,21 @@ export interface UsageStats {
     sessionCount: number;
 }
 
+// Stored Logo for the Logo Panel
+export interface StoredLogo {
+    id: string;                    // crypto.randomUUID()
+    name: string;                  // 原始檔名
+    mimeType: string;              // image/png | image/jpeg | image/svg+xml
+    size: number;                  // 檔案大小 (bytes)
+    bytes: ArrayBuffer;            // 檔案原始資料（僅記憶體中）
+    previewUrl: string;            // URL.createObjectURL (runtime)
+    dimensions: { width: number; height: number };
+    addedAt: string;               // ISO timestamp
+}
+
+// Logo Panel 最大插槽數
+export const MAX_LOGO_SLOTS = 4;
+
 // Batch processing types
 export type BatchFileStatus =
     | 'pending'      // 等待處理

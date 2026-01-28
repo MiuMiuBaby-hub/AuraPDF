@@ -9,6 +9,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- **Logo Panel (右側面板)** - 多 Logo 管理功能
+  - 畫面右側新增 Logo 面板，支援最多 4 個 Logo 插槽
+  - 使用者可上傳、刪除、替換各個 Logo
+  - 每次只能選擇其中一個 Logo（藍色高亮 + 勾號標示）加入 PDF
+  - Logo 使用 IndexedDB 持久化儲存，重新整理頁面後仍保留
+  - 處理完成後回到主畫面，Logo 不會被清除
+  - 響應式設計：桌面版垂直排列於右側，手機版水平排列於上方
+  - 新增元件：
+    - `LogoPanel.tsx` - 右側面板容器
+    - `LogoSlot.tsx` - 單一 Logo 插槽（空白/已填入兩種狀態）
+  - 新增工具：
+    - `logoStorage.ts` - IndexedDB CRUD 操作
+  - 新增型別：
+    - `StoredLogo` - Logo 資料結構
+    - `MAX_LOGO_SLOTS` - 最大插槽數常數
+  - 版面從單欄改為 Flex 雙欄佈局（主內容 + 右側面板）
+  - 原有的 `LogoUploader` 元件不再於主畫面顯示（功能由 LogoPanel 取代）
+
 - **PDF Security / Password Protection** - PDF 安全性設定
   - 支援設定開啟密碼 (User Password)
   - 支援設定權限密碼 (Owner Password)

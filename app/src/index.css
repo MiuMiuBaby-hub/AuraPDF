@@ -126,6 +126,14 @@ input[type="range"]::-webkit-slider-thumb {
   animation: spin 1s linear infinite;
 }
 
+/* Logo Panel Sidebar */
+.logo-panel {
+  position: sticky;
+  top: 1rem;
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;

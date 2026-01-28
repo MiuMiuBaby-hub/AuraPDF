@@ -1,16 +1,16 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Loader2, ArrowRight, ArrowLeft, Download, CheckCircle, AlertTriangle, XCircle, Files, FileText } from 'lucide-react';
 
 // Types
-import type { AppStep, ProcessedPage, LogoPosition, PositionName, CostEstimate, UsageStats, BatchFile, BatchProgress, SecuritySettings as SecuritySettingsType } from './types';
+import type { AppStep, ProcessedPage, LogoPosition, PositionName, CostEstimate, UsageStats, BatchFile, BatchProgress, SecuritySettings as SecuritySettingsType, StoredLogo } from './types';
 
 // Components
 import { Header } from './components/Layout/Header';
 import { Stepper } from './components/Layout/Stepper';
 import { DisclaimerModal } from './components/Disclaimer/DisclaimerModal';
 import { PdfUploader } from './components/FileUpload/PdfUploader';
-import { LogoUploader } from './components/FileUpload/LogoUploader';
 import { LogoSettings } from './components/Settings/LogoSettings';
+import { LogoPanel } from './components/LogoPanel';
 import { SecuritySettings } from './components/Settings/SecuritySettings';
 import { PageGrid } from './components/Preview/PageGrid';
 import { PageEditor } from './components/Preview/PageEditor';
@@ -20,7 +20,8 @@ import { BatchFileList, BatchProgressDisplay } from './components/Batch';
 
 // Utils
 import { validatePdfFile, loadPdfDocument, renderPageToCanvas, getRenderScale } from './utils/pdfUtils';
-import { validateLogoFile, createImagePreviewUrl, revokeImagePreviewUrl, getImageMimeType } from './utils/imageUtils';
+import { validateLogoFile, revokeImagePreviewUrl } from './utils/imageUtils';
+import { loadAllLogos, saveLogoToSlot, deleteLogoFromSlot, getActiveLogoId, setActiveLogoId as setActiveLogoIdStorage } from './utils/logoStorage';
 import { detectLogoPosition, calculateLogoDimensions, getImageDimensions } from './utils/blankDetection';
 import { processPdfWithLogos, downloadPdf } from './utils/pdfProcessor';
 import { loadSettings, saveSettings, DEFAULT_SECURITY_SETTINGS } from './utils/settingsStorage';
@@ -46,12 +47,18 @@ function App() {
   const [pdfError, setPdfError] = useState<string | null>(null);
   const [isPdfValidating, setIsPdfValidating] = useState(false);
 
-  // Logo state
-  const [logoFile, setLogoFile] = useState<File | null>(null);
-  const [logoBytes, setLogoBytes] = useState<ArrayBuffer | null>(null);
-  const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
+  // Logo Panel state
+  const [logos, setLogos] = useState<(StoredLogo | null)[]>([null, null, null, null]);
+  const [activeLogoId, setActiveLogoId] = useState<string | null>(null);
   const [logoError, setLogoError] = useState<string | null>(null);
-  const [logoDimensions, setLogoDimensions] = useState<{ width: number; height: number } | null>(null);
+  const [logosLoaded, setLogosLoaded] = useState(false);
+
+  // Derived active logo values
+  const activeLogo = useMemo(
+    () => logos.find(l => l !== null && l.id === activeLogoId) ?? null,
+    [logos, activeLogoId]
+  );
+  const logoPreviewUrl = activeLogo?.previewUrl ?? null;
 
   // Settings - load from localStorage
   const [logoSize, setLogoSize] = useState(() => loadSettings().logoSize);
@@ -87,14 +94,44 @@ function App() {
   const [batchProgress, setBatchProgress] = useState<BatchProgress | null>(null);
   const [isBatchProcessing, setIsBatchProcessing] = useState(false);
 
-  // Cleanup logo preview URL on unmount
+  // Load logos from IndexedDB on mount
+  useEffect(() => {
+    async function init() {
+      try {
+        const loadedLogos = await loadAllLogos();
+        setLogos(loadedLogos);
+
+        const savedActiveId = getActiveLogoId();
+        if (savedActiveId && loadedLogos.some(l => l !== null && l.id === savedActiveId)) {
+          setActiveLogoId(savedActiveId);
+        } else {
+          const firstLogo = loadedLogos.find(l => l !== null);
+          if (firstLogo) {
+            setActiveLogoId(firstLogo.id);
+            setActiveLogoIdStorage(firstLogo.id);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load logos from IndexedDB:', err);
+      } finally {
+        setLogosLoaded(true);
+      }
+    }
+    init();
+  }, []);
+
+  // Track logos ref for unmount-only cleanup
+  // Individual revocations are handled in handleLogoUpload/handleLogoDelete
+  const logosRef = useRef(logos);
+  logosRef.current = logos;
+
   useEffect(() => {
     return () => {
-      if (logoPreviewUrl) {
-        revokeImagePreviewUrl(logoPreviewUrl);
-      }
+      logosRef.current.forEach(l => {
+        if (l?.previewUrl) revokeImagePreviewUrl(l.previewUrl);
+      });
     };
-  }, [logoPreviewUrl]);
+  }, []);
 
   // Handle PDF file selection
   const handlePdfSelect = useCallback(async (file: File) => {
@@ -125,51 +162,115 @@ function App() {
     setProcessedPages([]);
   }, []);
 
-  // Handle Logo file selection
-  const handleLogoSelect = useCallback(async (file: File) => {
+  // Handle Logo upload to a specific slot
+  const handleLogoUpload = useCallback(async (slotIndex: number, file: File) => {
     setLogoError(null);
 
     const result = await validateLogoFile(file);
-
     if (!result.valid) {
       setLogoError(result.error || '驗證失敗');
       return;
     }
 
-    // Cleanup old preview
-    if (logoPreviewUrl) {
-      revokeImagePreviewUrl(logoPreviewUrl);
+    // Cleanup old preview if replacing
+    const oldLogo = logos[slotIndex];
+    if (oldLogo?.previewUrl) {
+      revokeImagePreviewUrl(oldLogo.previewUrl);
     }
 
     const bytes = await file.arrayBuffer();
-    const previewUrl = createImagePreviewUrl(file);
     const dimensions = await getImageDimensions(bytes);
+    const blob = new Blob([bytes], { type: file.type });
+    const previewUrl = URL.createObjectURL(blob);
 
-    setLogoFile(file);
-    setLogoBytes(bytes);
-    setLogoPreviewUrl(previewUrl);
-    setLogoDimensions(dimensions);
-  }, [logoPreviewUrl]);
+    const newLogo: StoredLogo = {
+      id: crypto.randomUUID(),
+      name: file.name,
+      mimeType: file.type || 'image/png',
+      size: file.size,
+      bytes,
+      previewUrl,
+      dimensions,
+      addedAt: new Date().toISOString(),
+    };
 
-  // Handle Logo clear
-  const handleLogoClear = useCallback(() => {
-    if (logoPreviewUrl) {
-      revokeImagePreviewUrl(logoPreviewUrl);
+    setLogos(prev => {
+      const updated = [...prev];
+      updated[slotIndex] = newLogo;
+      return updated;
+    });
+
+    // Persist to IndexedDB
+    saveLogoToSlot(slotIndex, newLogo).catch(err =>
+      console.error('Failed to save logo to IndexedDB:', err)
+    );
+
+    // Auto-select if no active logo
+    if (!activeLogoId || (oldLogo && oldLogo.id === activeLogoId)) {
+      setActiveLogoId(newLogo.id);
+      setActiveLogoIdStorage(newLogo.id);
     }
-    setLogoFile(null);
-    setLogoBytes(null);
-    setLogoPreviewUrl(null);
-    setLogoError(null);
-    setLogoDimensions(null);
-    setProcessedPages([]);
-  }, [logoPreviewUrl]);
+
+    // Clear processed pages since logo changed
+    if (oldLogo && oldLogo.id === activeLogoId) {
+      setProcessedPages([]);
+    }
+  }, [logos, activeLogoId]);
+
+  // Handle Logo delete from a specific slot
+  const handleLogoDelete = useCallback((slotIndex: number) => {
+    const logo = logos[slotIndex];
+    if (!logo) return;
+
+    if (logo.previewUrl) {
+      revokeImagePreviewUrl(logo.previewUrl);
+    }
+
+    setLogos(prev => {
+      const updated = [...prev];
+      updated[slotIndex] = null;
+      return updated;
+    });
+
+    // Persist deletion
+    deleteLogoFromSlot(slotIndex).catch(err =>
+      console.error('Failed to delete logo from IndexedDB:', err)
+    );
+
+    // If deleted logo was active, auto-select next available
+    if (logo.id === activeLogoId) {
+      const remaining = logos.filter((l, i) => l !== null && i !== slotIndex);
+      const next = remaining[0];
+      if (next) {
+        setActiveLogoId(next.id);
+        setActiveLogoIdStorage(next.id);
+      } else {
+        setActiveLogoId(null);
+        setActiveLogoIdStorage(null);
+      }
+      setProcessedPages([]);
+    }
+  }, [logos, activeLogoId]);
+
+  // Handle selecting a logo as active
+  const handleLogoSelectActive = useCallback((slotIndex: number) => {
+    const logo = logos[slotIndex];
+    if (!logo) return;
+
+    if (logo.id !== activeLogoId) {
+      setActiveLogoId(logo.id);
+      setActiveLogoIdStorage(logo.id);
+      setProcessedPages([]);
+    }
+  }, [logos, activeLogoId]);
 
   // Can proceed to next step
-  const canProceed = pdfFile && pdfBytes && logoFile && logoBytes && !pdfError && !logoError;
+  const canProceed = pdfFile && pdfBytes && activeLogo && !pdfError && !logoError;
 
   // Process PDF and detect positions
   const handleAnalyze = useCallback(async () => {
-    if (!pdfBytes || !logoBytes || !logoDimensions) return;
+    if (!pdfBytes || !activeLogo) return;
+    const logoDims_src = activeLogo.dimensions;
 
     setIsProcessing(true);
     setProcessingProgress(0);
@@ -199,8 +300,8 @@ function App() {
 
         // Calculate logo dimensions in render coordinates
         const logoDims = calculateLogoDimensions(
-          logoDimensions.width,
-          logoDimensions.height,
+          logoDims_src.width,
+          logoDims_src.height,
           effectiveLogoSize * renderScale
         );
 
@@ -242,7 +343,7 @@ function App() {
     } finally {
       setIsProcessing(false);
     }
-  }, [pdfBytes, logoBytes, logoDimensions, logoSize, preferredPosition, autoSize, autoSizePercent]);
+  }, [pdfBytes, activeLogo, logoSize, preferredPosition, autoSize, autoSizePercent]);
 
   // Handle position change in editor
   const handlePositionChange = useCallback((pageNumber: number, position: LogoPosition) => {
@@ -287,22 +388,23 @@ function App() {
 
   // Handle download
   const handleDownload = useCallback(async () => {
-    if (!logoFile || !pdfFile) return;
+    if (!activeLogo || !pdfFile) return;
 
     setIsDownloading(true);
 
     try {
-      // Re-read files to get fresh ArrayBuffers (avoid detached buffer issues)
+      // Re-read PDF to get fresh ArrayBuffer (avoid detached buffer issues)
       const freshPdfBytes = await pdfFile.arrayBuffer();
-      const freshLogoBytes = await logoFile.arrayBuffer();
+      // Copy logo bytes to avoid detached buffer issues
+      const freshLogoBytes = activeLogo.bytes.slice(0);
 
       const resultBytes = await processPdfWithLogos(
         freshPdfBytes,
         freshLogoBytes,
-        getImageMimeType(logoFile),
+        activeLogo.mimeType,
         processedPages,
         logoOpacity,
-        logoDimensions ?? undefined,
+        activeLogo.dimensions,
         securitySettings
       );
 
@@ -323,7 +425,7 @@ function App() {
     } finally {
       setIsDownloading(false);
     }
-  }, [logoFile, pdfFile, processedPages, logoOpacity, logoSize, logoDimensions, securitySettings]);
+  }, [activeLogo, pdfFile, processedPages, logoOpacity, securitySettings]);
 
   // Handle back
   const handleBack = useCallback(() => {
@@ -334,15 +436,14 @@ function App() {
     }
   }, [currentStep]);
 
-  // Handle start over
+  // Handle start over - logos persist, only clear PDF state
   const handleStartOver = useCallback(() => {
     handlePdfClear();
-    handleLogoClear();
     setCurrentStep('upload');
     setProcessedPages([]);
     setBatchFiles([]);
     setIsBatchMode(false);
-  }, [handlePdfClear, handleLogoClear]);
+  }, [handlePdfClear]);
 
   // Handle batch files select
   const handleBatchFilesSelect = useCallback(async (files: File[]) => {
@@ -366,7 +467,8 @@ function App() {
 
   // Handle batch analyze
   const handleBatchAnalyze = useCallback(async () => {
-    if (!logoBytes || !logoDimensions || batchFiles.length === 0) return;
+    if (!activeLogo || batchFiles.length === 0) return;
+    const batchLogoDims = activeLogo.dimensions;
 
     setIsBatchProcessing(true);
     const renderScale = getRenderScale();
@@ -428,8 +530,8 @@ function App() {
           }
 
           const logoDims = calculateLogoDimensions(
-            logoDimensions.width,
-            logoDimensions.height,
+            batchLogoDims.width,
+            batchLogoDims.height,
             effectiveLogoSize * renderScale
           );
 
@@ -464,11 +566,11 @@ function App() {
     setIsBatchProcessing(false);
     setBatchProgress(null);
     setCurrentStep('preview');
-  }, [logoBytes, logoDimensions, batchFiles, logoSize, preferredPosition, autoSize, autoSizePercent]);
+  }, [activeLogo, batchFiles, logoSize, preferredPosition, autoSize, autoSizePercent]);
 
   // Handle batch download
   const handleBatchDownload = useCallback(async () => {
-    if (!logoFile || batchFiles.length === 0) return;
+    if (!activeLogo || batchFiles.length === 0) return;
 
     setIsBatchProcessing(true);
     const readyFiles = batchFiles.filter(f => f.status === 'ready' && f.processedPages);
@@ -490,15 +592,15 @@ function App() {
 
       try {
         const freshPdfBytes = await bf.file.arrayBuffer();
-        const freshLogoBytes = await logoFile.arrayBuffer();
+        const freshLogoBytes = activeLogo.bytes.slice(0);
 
         const resultBytes = await processPdfWithLogos(
           freshPdfBytes,
           freshLogoBytes,
-          getImageMimeType(logoFile),
+          activeLogo.mimeType,
           bf.processedPages!,
           logoOpacity,
-          logoDimensions ?? undefined,
+          activeLogo.dimensions,
           securitySettings
         );
 
@@ -537,7 +639,7 @@ function App() {
     setIsBatchProcessing(false);
     setBatchProgress(null);
     setCurrentStep('download');
-  }, [logoFile, batchFiles, logoOpacity, logoDimensions, securitySettings]);
+  }, [activeLogo, batchFiles, logoOpacity, securitySettings]);
 
   // Get status counts
   const statusCounts = {
@@ -565,7 +667,8 @@ function App() {
           <Header />
           <Stepper currentStep={currentStep} />
 
-          <main className="max-w-6xl mx-auto px-4 pb-12">
+          <div className="flex flex-col lg:flex-row max-w-[1400px] mx-auto px-4 pb-12 gap-6">
+          <main className="flex-1 min-w-0 order-2 lg:order-1">
         {/* Step 1: Upload */}
         {currentStep === 'upload' && (
           <div className="space-y-6">
@@ -593,37 +696,27 @@ function App() {
               </div>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-6">
-              {!isBatchMode ? (
-                <PdfUploader
-                  file={pdfFile}
-                  pageCount={pdfPageCount}
-                  isValidating={isPdfValidating}
-                  error={pdfError}
-                  onFileSelect={handlePdfSelect}
-                  onClear={handlePdfClear}
-                />
-              ) : (
-                <PdfUploader
-                  file={null}
-                  pageCount={null}
-                  isValidating={false}
-                  error={null}
-                  onFileSelect={() => {}}
-                  onClear={() => {}}
-                  multiple
-                  onFilesSelect={handleBatchFilesSelect}
-                />
-              )}
-
-              <LogoUploader
-                file={logoFile}
-                previewUrl={logoPreviewUrl}
-                error={logoError}
-                onFileSelect={handleLogoSelect}
-                onClear={handleLogoClear}
+            {!isBatchMode ? (
+              <PdfUploader
+                file={pdfFile}
+                pageCount={pdfPageCount}
+                isValidating={isPdfValidating}
+                error={pdfError}
+                onFileSelect={handlePdfSelect}
+                onClear={handlePdfClear}
               />
-            </div>
+            ) : (
+              <PdfUploader
+                file={null}
+                pageCount={null}
+                isValidating={false}
+                error={null}
+                onFileSelect={() => {}}
+                onClear={() => {}}
+                multiple
+                onFilesSelect={handleBatchFilesSelect}
+              />
+            )}
 
             {/* Batch file list */}
             {isBatchMode && batchFiles.length > 0 && (
@@ -642,7 +735,7 @@ function App() {
               />
             )}
 
-            {logoFile && logoPreviewUrl && (
+            {activeLogo && (
               <>
                 <LogoSettings
                   logoSize={logoSize}
@@ -686,7 +779,7 @@ function App() {
               ) : (
                 <button
                   onClick={handleBatchAnalyze}
-                  disabled={!logoFile || batchFiles.length === 0 || isBatchProcessing}
+                  disabled={!activeLogo || batchFiles.length === 0 || isBatchProcessing}
                   className="btn-primary flex items-center gap-2 px-8 py-3 text-lg"
                 >
                   {isBatchProcessing ? (
@@ -707,7 +800,7 @@ function App() {
         )}
 
         {/* Step 2: Preview */}
-        {currentStep === 'preview' && logoPreviewUrl && (
+        {currentStep === 'preview' && activeLogo && (
           <div className="space-y-6">
             {/* Batch mode preview */}
             {isBatchMode ? (
@@ -768,7 +861,7 @@ function App() {
 
                 <PageGrid
                   pages={processedPages}
-                  logoPreviewUrl={logoPreviewUrl}
+                  logoPreviewUrl={activeLogo.previewUrl}
                   logoOpacity={logoOpacity}
                   logoSize={logoSize}
                   selectedPage={selectedPage}
@@ -867,6 +960,19 @@ function App() {
           </div>
         )}
       </main>
+
+          <aside className="w-full lg:w-72 lg:shrink-0 order-1 lg:order-2">
+            <LogoPanel
+              logos={logos}
+              activeLogoId={activeLogoId}
+              onLogoUpload={handleLogoUpload}
+              onLogoDelete={handleLogoDelete}
+              onLogoSelect={handleLogoSelectActive}
+              uploadError={logoError}
+              isLoading={!logosLoaded}
+            />
+          </aside>
+          </div>
 
           {/* Page Editor Modal */}
           {selectedPageData && logoPreviewUrl && (
