@@ -50,6 +50,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
     - 免責條款
     - 使用者責任
 
+### Fixed
+- **旋轉 PDF 頁面 Logo 嵌入修正** - 修復含有頁面旋轉屬性的 PDF 檔案 Logo 嵌入問題
+  - **座標轉換修正** (`pdfProcessor.ts`)
+    - 新增 `getPageRotation()` 函數讀取 PDF 頁面旋轉角度
+    - 新增 `transformCanvasToPdf()` 函數處理 Canvas→PDF 座標轉換
+    - 支援 0°、90°、180°、270° 四種旋轉角度的正確座標映射
+    - 使用有效尺寸（effective dimensions）進行正規化，解決旋轉頁面寬高交換問題
+  - **Logo 圖片旋轉修正** (`pdfProcessor.ts`)
+    - 新增 `rotateImage()` 函數預旋轉 Logo 圖片以抵消頁面旋轉
+    - Logo 嵌入時自動反向旋轉 `(360 - rotation)°`，確保 Logo 在顯示時方向正確
+    - 90°/270° 旋轉頁面自動交換繪製尺寸（drawWidth/drawHeight）
+    - 新增 `rotation:opacity` 複合快取鍵，避免重複處理相同旋轉+透明度組合
+  - **偵測邏輯修正** (`blankDetection.ts`)
+    - 修正使用者指定位置偏好時，自動偵測邏輯會覆蓋使用者選擇的問題
+    - 當有指定偏好位置時，一律使用使用者指定位置，偵測狀態僅作為參考資訊
+
 ### Dependencies
 - Added `jszip@^3.10.1` for ZIP file creation
 

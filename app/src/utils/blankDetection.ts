@@ -115,18 +115,8 @@ export function detectLogoPosition(
     const areaWidth = logoWidth + LOGO_MARGIN * 2;
     const areaHeight = logoHeight + LOGO_MARGIN * 2;
 
-    // Reorder positions if preferred position is specified
-    let positions = [...POSITION_PRIORITY];
-    if (preferredPosition) {
-        const preferredIndex = positions.findIndex(p => p.name === preferredPosition);
-        if (preferredIndex > 0) {
-            const [preferred] = positions.splice(preferredIndex, 1);
-            positions.unshift(preferred);
-        }
-    }
-
-    // Try each position
-    for (const pos of positions) {
+    // Helper function to calculate position and status
+    const calculatePosition = (pos: PositionConfig): { position: LogoPosition; status: 'blank' | 'light' | 'occupied' } => {
         const x = Math.floor(pos.xRatio * pageWidth - areaWidth / 2);
         const y = Math.floor(pos.yRatio * pageHeight - areaHeight / 2);
 
@@ -136,15 +126,37 @@ export function detectLogoPosition(
 
         const status = analyzePixelArea(ctx, safeX, safeY, areaWidth, areaHeight);
 
+        return {
+            position: {
+                x: safeX + LOGO_MARGIN,
+                y: safeY + LOGO_MARGIN,
+                width: logoWidth,
+                height: logoHeight,
+            },
+            status,
+        };
+    };
+
+    // If user specified a preferred position, ALWAYS use it (don't override with auto-detection)
+    if (preferredPosition) {
+        const preferredConfig = getPositionConfig(preferredPosition);
+        const { position, status } = calculatePosition(preferredConfig);
+        return {
+            pageNumber: 0,
+            position,
+            status,
+            positionName: preferredPosition,
+        };
+    }
+
+    // No preferred position: use automatic detection to find the best blank/light area
+    for (const pos of POSITION_PRIORITY) {
+        const { position, status } = calculatePosition(pos);
+
         if (status === 'blank' || status === 'light') {
             return {
-                pageNumber: 0, // Will be set by caller
-                position: {
-                    x: safeX + LOGO_MARGIN,
-                    y: safeY + LOGO_MARGIN,
-                    width: logoWidth,
-                    height: logoHeight,
-                },
+                pageNumber: 0,
+                position,
                 status,
                 positionName: pos.name,
             };
@@ -152,19 +164,13 @@ export function detectLogoPosition(
     }
 
     // No suitable position found, return first position with 'occupied' status
-    const defaultPos = positions[0];
-    const x = Math.floor(defaultPos.xRatio * pageWidth - logoWidth / 2);
-    const y = Math.floor(defaultPos.yRatio * pageHeight - logoHeight / 2);
+    const defaultPos = POSITION_PRIORITY[0];
+    const { position, status } = calculatePosition(defaultPos);
 
     return {
         pageNumber: 0,
-        position: {
-            x: Math.max(LOGO_MARGIN, Math.min(x, pageWidth - logoWidth - LOGO_MARGIN)),
-            y: Math.max(LOGO_MARGIN, Math.min(y, pageHeight - logoHeight - LOGO_MARGIN)),
-            width: logoWidth,
-            height: logoHeight,
-        },
-        status: 'occupied',
+        position,
+        status,
         positionName: defaultPos.name,
     };
 }
