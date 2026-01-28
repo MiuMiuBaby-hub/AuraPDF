@@ -10,6 +10,7 @@
 |------|------|
 | [PRD.md](./PRD.md) | 產品需求文件 - 完整功能規格與使用者故事 |
 | [CHANGELOG.md](./CHANGELOG.md) | 版本更新記錄 |
+| [ROADMAP.md](./ROADMAP.md) | 功能規劃藍圖 - 計畫中與已完成的功能清單 |
 | [DEPLOYMENT.md](./DEPLOYMENT.md) | 部署指南 - Firebase Hosting 設定與 CI/CD |
 
 ---
