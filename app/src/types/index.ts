@@ -164,3 +164,67 @@ export interface BatchProgress {
     phase: 'validating' | 'analyzing' | 'processing' | 'zipping';
     overallProgress: number;         // 0-100
 }
+
+// ============================================
+// 浮水印功能類型
+// ============================================
+
+// 支援的字型（pdf-lib 內建字型）
+export type WatermarkFontFamily = 'Helvetica' | 'Times-Roman' | 'Courier';
+
+// 浮水印位置模式
+export type WatermarkPosition =
+    | 'center'        // 頁面中央
+    | 'top-left'      // 左上
+    | 'top-right'     // 右上
+    | 'bottom-left'   // 左下
+    | 'bottom-right'  // 右下
+    | 'tile';         // 平鋪模式
+
+// 平鋪模式設定
+export interface TileSettings {
+    horizontalSpacing: number;       // 水平間距 (pt)
+    verticalSpacing: number;         // 垂直間距 (pt)
+    offsetAlternateRows: boolean;    // 是否錯位排列（棋盤式）
+}
+
+// 浮水印設定
+export interface WatermarkSettings {
+    enabled: boolean;                // 是否啟用浮水印
+    text: string;                    // 浮水印文字
+    fontFamily: WatermarkFontFamily; // 字型
+    fontSize: number;                // 字體大小 (12-72 pt)
+    color: string;                   // 顏色 (hex 格式如 #888888)
+    opacity: number;                 // 透明度 (10-100)
+    rotation: number;                // 旋轉角度 (-90 ~ 90 度)
+    position: WatermarkPosition;     // 位置模式
+    tileSettings: TileSettings;      // 平鋪模式設定
+}
+
+// ============================================
+// 頁首/頁尾功能類型
+// ============================================
+
+// 頁首/頁尾單一區塊
+export interface HeaderFooterTextBlock {
+    text: string;      // 支援變數: {page}, {total}, {date}, {title}
+    enabled: boolean;
+}
+
+// 頁首或頁尾的設定
+export interface HeaderFooterRow {
+    enabled: boolean;                // 是否啟用此列
+    left: HeaderFooterTextBlock;     // 左對齊區塊
+    center: HeaderFooterTextBlock;   // 置中區塊
+    right: HeaderFooterTextBlock;    // 右對齊區塊
+    fontFamily: WatermarkFontFamily; // 字型 (複用現有類型)
+    fontSize: number;                // 字體大小 (8-24 pt)
+    color: string;                   // 顏色 (hex 格式)
+    margin: number;                  // 與頁面邊緣的距離 (20-80 pt)
+}
+
+// 完整的頁首/頁尾設定
+export interface HeaderFooterSettings {
+    header: HeaderFooterRow;         // 頁首設定
+    footer: HeaderFooterRow;         // 頁尾設定
+}

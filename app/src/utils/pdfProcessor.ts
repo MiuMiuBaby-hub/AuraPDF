@@ -1,5 +1,5 @@
-import { PDFDocument } from 'pdf-lib-plus-encrypt';
-import type { ProcessedPage, SecuritySettings } from '../types';
+import { PDFDocument, StandardFonts, rgb, degrees } from 'pdf-lib-plus-encrypt';
+import type { ProcessedPage, SecuritySettings, WatermarkSettings, WatermarkFontFamily, HeaderFooterSettings, HeaderFooterRow } from '../types';
 import { getRenderScale } from './pdfUtils';
 
 // Get page rotation angle
@@ -275,19 +275,319 @@ function calculateLogoDimensions(
     }
 }
 
-// Process PDF and add logos to each page
+// ============================================
+// 浮水印繪製功能
+// ============================================
+
+// 解析 hex 顏色為 RGB (0-1 範圍)
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+        r: parseInt(result[1], 16) / 255,
+        g: parseInt(result[2], 16) / 255,
+        b: parseInt(result[3], 16) / 255,
+    } : { r: 0.5, g: 0.5, b: 0.5 };
+}
+
+// 取得 pdf-lib 標準字型
+async function getStandardFont(
+    pdfDoc: PDFDocument,
+    fontFamily: WatermarkFontFamily
+) {
+    switch (fontFamily) {
+        case 'Times-Roman':
+            return pdfDoc.embedFont(StandardFonts.TimesRoman);
+        case 'Courier':
+            return pdfDoc.embedFont(StandardFonts.Courier);
+        case 'Helvetica':
+        default:
+            return pdfDoc.embedFont(StandardFonts.Helvetica);
+    }
+}
+
+// 計算浮水印位置（支援單點和平鋪）
+function calculateWatermarkPositions(
+    watermark: WatermarkSettings,
+    pageWidth: number,
+    pageHeight: number,
+    textWidth: number,
+    textHeight: number
+): Array<{ x: number; y: number }> {
+    const margin = 50;
+
+    if (watermark.position === 'tile' && watermark.tileSettings) {
+        // 平鋪模式
+        const { horizontalSpacing, verticalSpacing, offsetAlternateRows } = watermark.tileSettings;
+        const positions: Array<{ x: number; y: number }> = [];
+
+        // 計算需要多少行/列（加上額外的以覆蓋旋轉後的邊緣）
+        const extraMargin = Math.max(textWidth, textHeight);
+        const startX = -extraMargin;
+        const startY = -extraMargin;
+        const endX = pageWidth + extraMargin;
+        const endY = pageHeight + extraMargin;
+
+        let row = 0;
+        for (let y = startY; y < endY; y += verticalSpacing) {
+            const offsetX = (offsetAlternateRows && row % 2 === 1) ? horizontalSpacing / 2 : 0;
+            for (let x = startX + offsetX; x < endX; x += horizontalSpacing) {
+                positions.push({ x, y });
+            }
+            row++;
+        }
+
+        // 限制最大數量以避免效能問題
+        return positions.slice(0, 200);
+    }
+
+    // 單點模式
+    let x: number, y: number;
+    switch (watermark.position) {
+        case 'top-left':
+            x = margin;
+            y = pageHeight - margin - textHeight;
+            break;
+        case 'top-right':
+            x = pageWidth - textWidth - margin;
+            y = pageHeight - margin - textHeight;
+            break;
+        case 'bottom-left':
+            x = margin;
+            y = margin;
+            break;
+        case 'bottom-right':
+            x = pageWidth - textWidth - margin;
+            y = margin;
+            break;
+        case 'center':
+        default:
+            x = (pageWidth - textWidth) / 2;
+            y = (pageHeight - textHeight) / 2;
+            break;
+    }
+
+    return [{ x, y }];
+}
+
+// 在頁面上繪製浮水印
+async function drawWatermarkOnPage(
+    page: ReturnType<PDFDocument['getPage']>,
+    watermark: WatermarkSettings,
+    font: Awaited<ReturnType<PDFDocument['embedFont']>>
+) {
+    const { width, height } = page.getSize();
+    const { r, g, b } = hexToRgb(watermark.color);
+    const textWidth = font.widthOfTextAtSize(watermark.text, watermark.fontSize);
+    const textHeight = watermark.fontSize;
+
+    // 計算所有浮水印位置
+    const positions = calculateWatermarkPositions(
+        watermark,
+        width,
+        height,
+        textWidth,
+        textHeight
+    );
+
+    // 繪製每個浮水印
+    for (const pos of positions) {
+        page.drawText(watermark.text, {
+            x: pos.x,
+            y: pos.y,
+            size: watermark.fontSize,
+            font,
+            color: rgb(r, g, b),
+            opacity: watermark.opacity / 100,
+            rotate: degrees(watermark.rotation),
+        });
+    }
+}
+
+// ============================================
+// 頁首/頁尾繪製功能
+// ============================================
+
+// 替換頁首/頁尾文字中的變數
+function replaceHeaderFooterVariables(
+    text: string,
+    pageNumber: number,
+    totalPages: number,
+    fileName: string
+): string {
+    const dateString = new Date().toLocaleDateString('zh-TW');
+    const titleString = fileName.replace(/\.pdf$/i, '');
+
+    return text
+        .replace(/\{page\}/g, String(pageNumber))
+        .replace(/\{total\}/g, String(totalPages))
+        .replace(/\{date\}/g, dateString)
+        .replace(/\{title\}/g, titleString);
+}
+
+// 在頁面上繪製頁首或頁尾
+function drawHeaderFooterRowOnPage(
+    page: ReturnType<PDFDocument['getPage']>,
+    row: HeaderFooterRow,
+    isHeader: boolean,
+    font: Awaited<ReturnType<PDFDocument['embedFont']>>,
+    pageNumber: number,
+    totalPages: number,
+    fileName: string
+) {
+    if (!row.enabled) return;
+
+    const { width: pageWidth, height: pageHeight } = page.getSize();
+    const { r, g, b } = hexToRgb(row.color);
+
+    // 計算 Y 座標
+    const y = isHeader
+        ? pageHeight - row.margin  // 頁首：從頂部往下
+        : row.margin;              // 頁尾：從底部往上
+
+    // 繪製三個區塊
+    const blocks: Array<{ block: typeof row.left; alignment: 'left' | 'center' | 'right' }> = [
+        { block: row.left, alignment: 'left' },
+        { block: row.center, alignment: 'center' },
+        { block: row.right, alignment: 'right' },
+    ];
+
+    for (const { block, alignment } of blocks) {
+        if (!block.enabled || !block.text.trim()) continue;
+
+        const processedText = replaceHeaderFooterVariables(
+            block.text,
+            pageNumber,
+            totalPages,
+            fileName
+        );
+
+        const textWidth = font.widthOfTextAtSize(processedText, row.fontSize);
+
+        // 計算 X 座標
+        let x: number;
+        switch (alignment) {
+            case 'left':
+                x = row.margin;
+                break;
+            case 'center':
+                x = (pageWidth - textWidth) / 2;
+                break;
+            case 'right':
+                x = pageWidth - textWidth - row.margin;
+                break;
+        }
+
+        page.drawText(processedText, {
+            x,
+            y,
+            size: row.fontSize,
+            font,
+            color: rgb(r, g, b),
+        });
+    }
+}
+
+// 在頁面上繪製頁首和頁尾
+async function drawHeaderFooterOnPage(
+    page: ReturnType<PDFDocument['getPage']>,
+    headerFooter: HeaderFooterSettings,
+    headerFont: Awaited<ReturnType<PDFDocument['embedFont']>>,
+    footerFont: Awaited<ReturnType<PDFDocument['embedFont']>>,
+    pageNumber: number,
+    totalPages: number,
+    fileName: string
+) {
+    // 繪製頁首
+    drawHeaderFooterRowOnPage(
+        page,
+        headerFooter.header,
+        true,
+        headerFont,
+        pageNumber,
+        totalPages,
+        fileName
+    );
+
+    // 繪製頁尾
+    drawHeaderFooterRowOnPage(
+        page,
+        headerFooter.footer,
+        false,
+        footerFont,
+        pageNumber,
+        totalPages,
+        fileName
+    );
+}
+
+// Process PDF and add logos/watermarks to each page
 export async function processPdfWithLogos(
     pdfBytes: ArrayBuffer,
-    logoBytes: ArrayBuffer,
-    logoMimeType: string,
+    logoBytes: ArrayBuffer | null,
+    logoMimeType: string | null,
     processedPages: ProcessedPage[],
     logoOpacity: number = 100,
     logoDimensions?: { width: number; height: number },
-    security?: SecuritySettings
+    security?: SecuritySettings,
+    watermark?: WatermarkSettings,
+    headerFooter?: HeaderFooterSettings,
+    fileName: string = 'document.pdf'
 ): Promise<Uint8Array> {
     // Load the PDF
     const pdfDoc = await PDFDocument.load(pdfBytes);
     const pages = pdfDoc.getPages();
+    const totalPages = pages.length;
+
+    // 1. 處理浮水印（先於 Logo，作為背景層）
+    if (watermark?.enabled && watermark.text.trim()) {
+        const font = await getStandardFont(pdfDoc, watermark.fontFamily);
+        for (const page of pages) {
+            await drawWatermarkOnPage(page, watermark, font);
+        }
+    }
+
+    // 2. 處理頁首/頁尾（浮水印之後，Logo 之前）
+    if (headerFooter && (headerFooter.header.enabled || headerFooter.footer.enabled)) {
+        // 分別載入頁首和頁尾的字體（可能不同）
+        const headerFont = headerFooter.header.enabled
+            ? await getStandardFont(pdfDoc, headerFooter.header.fontFamily)
+            : await getStandardFont(pdfDoc, 'Helvetica');
+        const footerFont = headerFooter.footer.enabled
+            ? await getStandardFont(pdfDoc, headerFooter.footer.fontFamily)
+            : await getStandardFont(pdfDoc, 'Helvetica');
+
+        for (let i = 0; i < pages.length; i++) {
+            await drawHeaderFooterOnPage(
+                pages[i],
+                headerFooter,
+                headerFont,
+                footerFont,
+                i + 1,        // pageNumber (1-based)
+                totalPages,
+                fileName
+            );
+        }
+    }
+
+    // 3. 處理 Logo（如果有提供）
+    if (!logoBytes || !logoMimeType) {
+        // 沒有 Logo，只套用加密後返回
+        if (security?.enabled && (security.userPassword || security.ownerPassword)) {
+            const userPwd = security.userPassword || security.ownerPassword || 'user';
+            const ownerPwd = security.ownerPassword || security.userPassword || 'owner';
+            await pdfDoc.encrypt({
+                userPassword: userPwd,
+                ownerPassword: ownerPwd,
+                permissions: {
+                    printing: security.permissions.printing,
+                    copying: security.permissions.copying,
+                    modifying: security.permissions.modifying,
+                    annotating: security.permissions.annotating,
+                }
+            });
+        }
+        return await pdfDoc.save();
+    }
 
     // Handle SVG conversion
     let baseLogoBytes = logoBytes;

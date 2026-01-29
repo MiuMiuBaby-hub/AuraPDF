@@ -17,11 +17,13 @@
 ## 一、實用功能擴展
 
 ### 1. 浮水印功能
-**狀態：Planned**
+**狀態：Done** *(v1.3)*
 
 - 支援文字浮水印（如「機密」、「草稿」、公司名稱）
-- 可調整字體、顏色、旋轉角度
-- 平鋪模式（整頁重複浮水印）
+- 可調整字體（Helvetica、Times Roman、Courier）、顏色、透明度、旋轉角度
+- 平鋪模式（整頁重複浮水印，支援棋盤式錯位排列）
+- 單點定位（中央、四角）
+- 設定自動儲存到 localStorage
 
 ### 2. 多 Logo 支援
 **狀態：Done** *(v1.1 — Logo Panel)*
@@ -56,11 +58,13 @@
 ## 二、編輯功能增強
 
 ### 6. 頁首 / 頁尾編輯
-**狀態：Planned**
+**狀態：Done** *(v1.4)*
 
-- 加入頁碼
-- 加入日期、文件標題
-- 自訂頁首頁尾文字
+- 頁首/頁尾各支援左、中、右三個獨立區塊
+- 變數支援：`{page}` 當前頁、`{total}` 總頁數、`{date}` 日期、`{title}` 文件標題
+- 可自訂字型（Helvetica、Times Roman、Courier）、大小、顏色、邊距
+- 快速範本插入（頁碼、日期等）
+- 設定自動儲存到 localStorage
 
 ### 7. Logo 進階調整
 **狀態：Planned**
@@ -116,6 +120,8 @@
 | v1.1 | Logo Panel（多 Logo 管理面板） | 2026-01-28 |
 | v1.1 | 旋轉 PDF 頁面 Logo 嵌入修正 | 2026-01-28 |
 | v1.2 | 自動遞補機制 + 兩階段偵測演算法 | 2026-01-28 |
+| v1.3 | 浮水印功能（文字、平鋪、透明度） | 2026-01-29 |
+| v1.4 | 頁首/頁尾編輯（頁碼、日期、標題變數） | 2026-01-29 |
 
 ---
 
@@ -143,4 +149,65 @@
 
 ---
 
-*最後更新：2026-01-28*
+### v1.3 — 浮水印功能 (2026-01-29)
+
+**新增功能：**
+- 文字浮水印系統，獨立於 Logo 功能
+- 可自訂文字內容（預設選項：機密、草稿、CONFIDENTIAL、DRAFT、僅供內部使用）
+- 字體選擇（Helvetica、Times Roman、Courier）
+- 顏色選擇器 + 快捷顏色按鈕
+- 透明度控制（10-100%）
+- 旋轉角度控制（-90° ~ 90°）
+- 位置選擇（中央、四角、平鋪模式）
+- 平鋪模式進階設定：
+  - 水平/垂直間距調整
+  - 棋盤式錯位排列選項
+- 設定自動儲存到 localStorage
+- 內聯即時預覽
+
+**新增檔案：**
+- `types/index.ts`：WatermarkSettings、TileSettings 等類型
+- `components/Settings/WatermarkSettings.tsx`：浮水印設定面板 UI
+- `utils/settingsStorage.ts`：擴展支援浮水印設定持久化
+- `utils/pdfProcessor.ts`：浮水印繪製邏輯（使用 pdf-lib drawText）
+
+**技術細節：**
+- 浮水印在 Logo 之前繪製（作為背景層）
+- 使用 pdf-lib 的 StandardFonts 內建字型
+- 平鋪模式最多 200 個浮水印以確保效能
+- 支援批量處理模式
+
+---
+
+### v1.4 — 頁首/頁尾編輯 (2026-01-29)
+
+**新增功能：**
+- 頁首/頁尾系統，獨立於浮水印和 Logo 功能
+- 頁首和頁尾各支援左對齊、置中、右對齊三個獨立區塊
+- 動態變數替換：
+  - `{page}` - 當前頁碼
+  - `{total}` - 總頁數
+  - `{date}` - 處理日期（zh-TW 格式）
+  - `{title}` - 文件標題（檔名去除 .pdf）
+- 快速範本插入按鈕
+- 可自訂字型、大小（8-24pt）、顏色、邊距（20-80pt）
+- 設定自動儲存到 localStorage
+
+**新增檔案：**
+- `components/Settings/HeaderFooterSettings.tsx`：頁首/頁尾設定面板 UI
+
+**修改檔案：**
+- `types/index.ts`：新增 HeaderFooterSettings、HeaderFooterRow、HeaderFooterTextBlock 類型
+- `utils/settingsStorage.ts`：新增預設值和驗證函數
+- `utils/pdfProcessor.ts`：新增繪製邏輯和變數替換函數
+- `App.tsx`：整合狀態管理和組件渲染
+
+**技術細節：**
+- 繪製順序：浮水印（背景層）→ 頁首/頁尾 → Logo（前景層）
+- 使用 pdf-lib 的 StandardFonts 內建字型（與浮水印相同限制）
+- 每頁最多 6 個 drawText 呼叫（頁首+頁尾各 3 區塊）
+- 支援批量處理模式，每個檔案的 {title} 變數獨立替換
+
+---
+
+*最後更新：2026-01-29*

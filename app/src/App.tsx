@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Loader2, ArrowRight, ArrowLeft, Download, CheckCircle, AlertTriangle, XCircle, Files, FileText } from 'lucide-react';
 
 // Types
-import type { AppStep, ProcessedPage, LogoPosition, PositionName, CostEstimate, UsageStats, BatchFile, BatchProgress, SecuritySettings as SecuritySettingsType, StoredLogo } from './types';
+import type { AppStep, ProcessedPage, LogoPosition, PositionName, CostEstimate, UsageStats, BatchFile, BatchProgress, SecuritySettings as SecuritySettingsType, StoredLogo, WatermarkSettings as WatermarkSettingsType, HeaderFooterSettings as HeaderFooterSettingsType } from './types';
 
 // Components
 import { Header } from './components/Layout/Header';
@@ -12,6 +12,8 @@ import { PdfUploader } from './components/FileUpload/PdfUploader';
 import { LogoSettings } from './components/Settings/LogoSettings';
 import { LogoPanel } from './components/LogoPanel';
 import { SecuritySettings } from './components/Settings/SecuritySettings';
+import { WatermarkSettings } from './components/Settings/WatermarkSettings';
+import { HeaderFooterSettings } from './components/Settings/HeaderFooterSettings';
 import { PageGrid } from './components/Preview/PageGrid';
 import { PageEditor } from './components/Preview/PageEditor';
 import { CostEstimateDisplay } from './components/Usage/CostEstimate';
@@ -72,10 +74,16 @@ function App() {
   // Security settings - NOT persisted to localStorage for security reasons
   const [securitySettings, setSecuritySettings] = useState<SecuritySettingsType>(() => ({ ...DEFAULT_SECURITY_SETTINGS }));
 
+  // Watermark settings - persisted to localStorage
+  const [watermarkSettings, setWatermarkSettings] = useState<WatermarkSettingsType>(() => loadSettings().watermark);
+
+  // Header/Footer settings - persisted to localStorage
+  const [headerFooterSettings, setHeaderFooterSettings] = useState<HeaderFooterSettingsType>(() => loadSettings().headerFooter);
+
   // Save settings to localStorage when they change
   useEffect(() => {
-    saveSettings({ logoSize, logoOpacity, preferredPosition, autoSize, autoSizePercent, autoFallback, fallbackPriority });
-  }, [logoSize, logoOpacity, preferredPosition, autoSize, autoSizePercent, autoFallback, fallbackPriority]);
+    saveSettings({ logoSize, logoOpacity, preferredPosition, autoSize, autoSizePercent, autoFallback, fallbackPriority, watermark: watermarkSettings, headerFooter: headerFooterSettings });
+  }, [logoSize, logoOpacity, preferredPosition, autoSize, autoSizePercent, autoFallback, fallbackPriority, watermarkSettings, headerFooterSettings]);
 
   // Processing state
   const [isProcessing, setIsProcessing] = useState(false);
@@ -409,7 +417,10 @@ function App() {
         processedPages,
         logoOpacity,
         activeLogo.dimensions,
-        securitySettings
+        securitySettings,
+        watermarkSettings,
+        headerFooterSettings,
+        pdfFile.name
       );
 
       downloadPdf(resultBytes, pdfFile.name);
@@ -429,7 +440,7 @@ function App() {
     } finally {
       setIsDownloading(false);
     }
-  }, [activeLogo, pdfFile, processedPages, logoOpacity, securitySettings]);
+  }, [activeLogo, pdfFile, processedPages, logoOpacity, securitySettings, watermarkSettings, headerFooterSettings]);
 
   // Handle back
   const handleBack = useCallback(() => {
@@ -612,7 +623,10 @@ function App() {
           bf.processedPages!,
           logoOpacity,
           activeLogo.dimensions,
-          securitySettings
+          securitySettings,
+          watermarkSettings,
+          headerFooterSettings,
+          bf.file.name
         );
 
         results.push({ originalName: bf.file.name, data: resultBytes });
@@ -650,7 +664,7 @@ function App() {
     setIsBatchProcessing(false);
     setBatchProgress(null);
     setCurrentStep('download');
-  }, [activeLogo, batchFiles, logoOpacity, securitySettings]);
+  }, [activeLogo, batchFiles, logoOpacity, securitySettings, watermarkSettings, headerFooterSettings]);
 
   // Get status counts
   const statusCounts = {
@@ -766,6 +780,14 @@ function App() {
                   fallbackPriority={fallbackPriority}
                   onFallbackPriorityChange={setFallbackPriority}
                   logoPreviewUrl={logoPreviewUrl}
+                />
+                <WatermarkSettings
+                  watermark={watermarkSettings}
+                  onWatermarkChange={setWatermarkSettings}
+                />
+                <HeaderFooterSettings
+                  headerFooter={headerFooterSettings}
+                  onHeaderFooterChange={setHeaderFooterSettings}
                 />
                 <SecuritySettings
                   security={securitySettings}
