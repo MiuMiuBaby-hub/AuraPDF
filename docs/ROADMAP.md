@@ -122,6 +122,7 @@
 | v1.2 | 自動遞補機制 + 兩階段偵測演算法 | 2026-01-28 |
 | v1.3 | 浮水印功能（文字、平鋪、透明度） | 2026-01-29 |
 | v1.4 | 頁首/頁尾編輯（頁碼、日期、標題變數） | 2026-01-29 |
+| v1.5 | CJK 浮水印字型 + 預覽/PDF 一致性修正 | 2026-01-31 |
 
 ---
 
@@ -210,4 +211,35 @@
 
 ---
 
-*最後更新：2026-01-29*
+### v1.5 — CJK 浮水印字型 + 預覽一致性修正 (2026-01-31)
+
+**新增功能：**
+- CJK（中日韓）字型支援，浮水印可正確渲染中文
+- `Noto Sans TC` 字型選項（字型選擇器新增「中文」標籤）
+- 三層 CDN 備援字型載入策略（jsdelivr → GitHub → Google Fonts API）
+- 輸入中文時自動切換字型（`useRef` 防止覆蓋手動選擇）
+- Latin-only 字型搭配中文時的 amber 警告提示
+
+**Bug 修正：**
+- 預覽 SVG 浮水印位置計算改為與 PDF 同步（先在 PDF 點空間計算，再轉換到 SVG canvas）
+- SVG `text-anchor` 統一為 `"start"`，匹配 PDF 的 baseline-start 渲染
+- `drawWatermarkOnPage` 旋轉頁面座標轉換修正（case 90 / 270），與 `drawHeaderFooterRowOnPage` 一致
+- 旋轉頁面浮水印文字角度補償：`degrees(watermark.rotation + rotation)`
+
+**新增檔案：**
+- `utils/fontLoader.ts`：CJK 字型載入器（含快取與字元覆蓋檢查）
+- `types/pdf-lib-fontkit.d.ts`：`@pdf-lib/fontkit` 類型宣告
+
+**修改檔案：**
+- `types/index.ts`：`WatermarkFontFamily` 新增 `'Noto Sans TC'`
+- `components/Settings/WatermarkSettings.tsx`：自動字型切換 + 警告提示
+- `components/Preview/PageCard.tsx`：重寫 `computeWatermarkPositions`，移除 `textAnchorForPosition` / `dominantBaselineForPosition`
+- `components/Preview/PageEditor.tsx`：同 PageCard 修正
+- `utils/pdfProcessor.ts`：CJK 字型嵌入 + 旋轉座標/角度修正
+
+**新增依賴：**
+- `@pdf-lib/fontkit` — pdf-lib 字型嵌入支援
+
+---
+
+*最後更新：2026-01-31*

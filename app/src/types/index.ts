@@ -169,8 +169,8 @@ export interface BatchProgress {
 // 浮水印功能類型
 // ============================================
 
-// 支援的字型（pdf-lib 內建字型）
-export type WatermarkFontFamily = 'Helvetica' | 'Times-Roman' | 'Courier';
+// 支援的字型（pdf-lib 內建字型 + CJK 外部字型）
+export type WatermarkFontFamily = 'Helvetica' | 'Times-Roman' | 'Courier' | 'Noto Sans TC';
 
 // 浮水印位置模式
 export type WatermarkPosition =

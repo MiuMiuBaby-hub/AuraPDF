@@ -1,6 +1,8 @@
 import { PDFDocument, StandardFonts, rgb, degrees } from 'pdf-lib-plus-encrypt';
+import fontkit from '@pdf-lib/fontkit';
 import type { ProcessedPage, SecuritySettings, WatermarkSettings, WatermarkFontFamily, HeaderFooterSettings, HeaderFooterRow } from '../types';
 import { getRenderScale } from './pdfUtils';
+import { containsNonWinAnsiChars, loadCjkFont } from './fontLoader';
 
 // Get page rotation angle
 function getPageRotation(page: ReturnType<PDFDocument['getPage']>): number {
@@ -376,29 +378,68 @@ async function drawWatermarkOnPage(
     font: Awaited<ReturnType<PDFDocument['embedFont']>>
 ) {
     const { width, height } = page.getSize();
+    const rotation = getPageRotation(page);
+
+    // For rotated pages, use the effective (displayed) dimensions
+    const isRotated = (rotation === 90 || rotation === 270);
+    const effectiveWidth = isRotated ? height : width;
+    const effectiveHeight = isRotated ? width : height;
+
     const { r, g, b } = hexToRgb(watermark.color);
     const textWidth = font.widthOfTextAtSize(watermark.text, watermark.fontSize);
     const textHeight = watermark.fontSize;
 
-    // 計算所有浮水印位置
+    // 計算所有浮水印位置（基於有效顯示尺寸）
     const positions = calculateWatermarkPositions(
         watermark,
-        width,
-        height,
+        effectiveWidth,
+        effectiveHeight,
         textWidth,
         textHeight
     );
 
+    console.info(`[Watermark] Page: ${width}x${height}, rotation=${rotation}, effective=${effectiveWidth}x${effectiveHeight}, positions=${positions.length}`);
+
     // 繪製每個浮水印
     for (const pos of positions) {
+        // Transform visual (effective) coordinates → MediaBox coordinates.
+        // pdf-lib drawText operates in raw MediaBox space; the viewer applies /Rotate afterwards.
+        // These formulas match drawHeaderFooterRowOnPage.
+        let drawX = pos.x;
+        let drawY = pos.y;
+
+        switch (rotation) {
+            case 90:
+                // Visual (vx, vy) → MediaBox (W - vy, vx)
+                drawX = width - pos.y;
+                drawY = pos.x;
+                break;
+            case 180:
+                // Visual (vx, vy) → MediaBox (W - vx, H - vy)
+                drawX = effectiveWidth - pos.x;
+                drawY = effectiveHeight - pos.y;
+                break;
+            case 270:
+                // Visual (vx, vy) → MediaBox (vy, H - vx)
+                drawX = pos.y;
+                drawY = height - pos.x;
+                break;
+            case 0:
+            default:
+                // No rotation: MediaBox = visual
+                break;
+        }
+
         page.drawText(watermark.text, {
-            x: pos.x,
-            y: pos.y,
+            x: drawX,
+            y: drawY,
             size: watermark.fontSize,
             font,
             color: rgb(r, g, b),
             opacity: watermark.opacity / 100,
-            rotate: degrees(watermark.rotation),
+            // Counter-rotate text by page rotation so it appears at the configured
+            // visual angle after the viewer applies /Rotate.
+            rotate: degrees(watermark.rotation + rotation),
         });
     }
 }
@@ -424,25 +465,33 @@ function replaceHeaderFooterVariables(
         .replace(/\{title\}/g, titleString);
 }
 
-// 在頁面上繪製頁首或頁尾
+// 在頁面上繪製頁首或頁尾（支援旋轉頁面）
 function drawHeaderFooterRowOnPage(
     page: ReturnType<PDFDocument['getPage']>,
     row: HeaderFooterRow,
     isHeader: boolean,
-    font: Awaited<ReturnType<PDFDocument['embedFont']>>,
+    standardFont: Awaited<ReturnType<PDFDocument['embedFont']>>,
+    cjkFont: Awaited<ReturnType<PDFDocument['embedFont']>> | null,
     pageNumber: number,
     totalPages: number,
     fileName: string
 ) {
     if (!row.enabled) return;
 
-    const { width: pageWidth, height: pageHeight } = page.getSize();
+    // getSize() returns raw MediaBox dimensions (unrotated)
+    const { width: W, height: H } = page.getSize();
+    const rotation = getPageRotation(page);
     const { r, g, b } = hexToRgb(row.color);
 
-    // 計算 Y 座標
-    const y = isHeader
-        ? pageHeight - row.margin  // 頁首：從頂部往下
-        : row.margin;              // 頁尾：從底部往上
+    // Effective (visual) dimensions after viewer rotation
+    const isRotated = (rotation === 90 || rotation === 270);
+    const effectiveW = isRotated ? H : W;
+    const effectiveH = isRotated ? W : H;
+
+    // Desired Y in visual (display) space
+    const visY = isHeader
+        ? effectiveH - row.margin  // 頁首：視覺頂部
+        : row.margin;              // 頁尾：視覺底部
 
     // 繪製三個區塊
     const blocks: Array<{ block: typeof row.left; alignment: 'left' | 'center' | 'right' }> = [
@@ -461,28 +510,58 @@ function drawHeaderFooterRowOnPage(
             fileName
         );
 
+        // Pick CJK font if processed text contains non-WinAnsi characters
+        const font = (cjkFont && containsNonWinAnsiChars(processedText))
+            ? cjkFont
+            : standardFont;
+
         const textWidth = font.widthOfTextAtSize(processedText, row.fontSize);
 
-        // 計算 X 座標
-        let x: number;
+        // Desired X in visual (display) space
+        let visX: number;
         switch (alignment) {
             case 'left':
-                x = row.margin;
+                visX = row.margin;
                 break;
             case 'center':
-                x = (pageWidth - textWidth) / 2;
+                visX = (effectiveW - textWidth) / 2;
                 break;
             case 'right':
-                x = pageWidth - textWidth - row.margin;
+                visX = effectiveW - textWidth - row.margin;
+                break;
+        }
+
+        // Transform visual coordinates → PDF (unrotated MediaBox) coordinates
+        // pdf-lib-plus-encrypt drawText operates in raw MediaBox space;
+        // the viewer applies /Rotate afterwards.
+        let pdfX: number, pdfY: number;
+        switch (rotation) {
+            case 90:
+                pdfX = W - visY;
+                pdfY = visX;
+                break;
+            case 180:
+                pdfX = W - visX;
+                pdfY = H - visY;
+                break;
+            case 270:
+                pdfX = visY;
+                pdfY = H - visX;
+                break;
+            default:
+                pdfX = visX;
+                pdfY = visY;
                 break;
         }
 
         page.drawText(processedText, {
-            x,
-            y,
+            x: pdfX,
+            y: pdfY,
             size: row.fontSize,
             font,
             color: rgb(r, g, b),
+            // Counter-rotate text so it appears horizontal after viewer rotation
+            ...(rotation !== 0 ? { rotate: degrees(rotation) } : {}),
         });
     }
 }
@@ -493,6 +572,7 @@ async function drawHeaderFooterOnPage(
     headerFooter: HeaderFooterSettings,
     headerFont: Awaited<ReturnType<PDFDocument['embedFont']>>,
     footerFont: Awaited<ReturnType<PDFDocument['embedFont']>>,
+    cjkFont: Awaited<ReturnType<PDFDocument['embedFont']>> | null,
     pageNumber: number,
     totalPages: number,
     fileName: string
@@ -503,6 +583,7 @@ async function drawHeaderFooterOnPage(
         headerFooter.header,
         true,
         headerFont,
+        cjkFont,
         pageNumber,
         totalPages,
         fileName
@@ -514,6 +595,7 @@ async function drawHeaderFooterOnPage(
         headerFooter.footer,
         false,
         footerFont,
+        cjkFont,
         pageNumber,
         totalPages,
         fileName
@@ -538,12 +620,51 @@ export async function processPdfWithLogos(
     const pages = pdfDoc.getPages();
     const totalPages = pages.length;
 
+    // Collect all text that will be rendered to detect CJK characters
+    const textsToCheck: string[] = [];
+    if (watermark?.enabled && watermark.text.trim()) {
+        textsToCheck.push(watermark.text);
+    }
+    if (headerFooter) {
+        for (const row of [headerFooter.header, headerFooter.footer]) {
+            if (row.enabled) {
+                for (const pos of ['left', 'center', 'right'] as const) {
+                    if (row[pos].enabled && row[pos].text.trim()) {
+                        textsToCheck.push(row[pos].text);
+                    }
+                }
+            }
+        }
+        // Also check filename ({title}) and date format ({date})
+        textsToCheck.push(fileName);
+        textsToCheck.push(new Date().toLocaleDateString('zh-TW'));
+    }
+
+    // Load CJK font if any text contains non-WinAnsi characters,
+    // or if user explicitly selected 'Noto Sans TC' font.
+    const needsCjkFont = textsToCheck.some(containsNonWinAnsiChars)
+        || watermark?.fontFamily === 'Noto Sans TC';
+    let cjkFont: Awaited<ReturnType<PDFDocument['embedFont']>> | null = null;
+    if (needsCjkFont) {
+        pdfDoc.registerFontkit(fontkit);
+        const cjkFontBytes = await loadCjkFont(textsToCheck);
+        console.info(`[Watermark] CJK font loaded: ${cjkFontBytes.byteLength} bytes`);
+        // Use subset: false — fontkit v1.x subsetting can corrupt CJK glyphs
+        cjkFont = await pdfDoc.embedFont(cjkFontBytes, { subset: false });
+    }
+
     // 1. 處理浮水印（先於 Logo，作為背景層）
     if (watermark?.enabled && watermark.text.trim()) {
-        const font = await getStandardFont(pdfDoc, watermark.fontFamily);
+        const usesCjk = containsNonWinAnsiChars(watermark.text) || watermark.fontFamily === 'Noto Sans TC';
+        const font = (cjkFont && usesCjk)
+            ? cjkFont
+            : await getStandardFont(pdfDoc, watermark.fontFamily);
+        console.info(`[Watermark] Drawing "${watermark.text}" on ${pages.length} pages, font=${usesCjk ? 'CJK' : watermark.fontFamily}, size=${watermark.fontSize}, opacity=${watermark.opacity}%`);
         for (const page of pages) {
             await drawWatermarkOnPage(page, watermark, font);
         }
+    } else {
+        console.info(`[Watermark] Skipped: enabled=${watermark?.enabled}, text="${watermark?.text}"`);
     }
 
     // 2. 處理頁首/頁尾（浮水印之後，Logo 之前）
@@ -562,6 +683,7 @@ export async function processPdfWithLogos(
                 headerFooter,
                 headerFont,
                 footerFont,
+                cjkFont,
                 i + 1,        // pageNumber (1-based)
                 totalPages,
                 fileName

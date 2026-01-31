@@ -905,6 +905,7 @@ function App() {
                   logoSize={logoSize}
                   selectedPage={selectedPage}
                   onPageSelect={setSelectedPage}
+                  watermark={watermarkSettings}
                 />
               </>
             )}
@@ -1032,6 +1033,7 @@ function App() {
               onResetPosition={() => handleResetPosition(selectedPageData.pageNumber)}
               onApplyToAll={() => handleApplyToAll(selectedPageData.pageNumber)}
               onClose={() => setSelectedPage(null)}
+              watermark={watermarkSettings}
             />
           )}
         </>

@@ -1,5 +1,9 @@
+import { useMemo } from 'react';
 import { CheckCircle, AlertTriangle, XCircle } from 'lucide-react';
-import type { ProcessedPage } from '../../types';
+import type { ProcessedPage, WatermarkSettings } from '../../types';
+
+// Render scale used by pdfUtils to rasterise pages
+const RENDER_SCALE = 1.5;
 
 interface PageCardProps {
     page: ProcessedPage;
@@ -8,6 +12,97 @@ interface PageCardProps {
     logoSize: number;
     onClick: () => void;
     isSelected?: boolean;
+    watermark?: WatermarkSettings;
+}
+
+/**
+ * Compute watermark positions that match the actual PDF rendering.
+ *
+ * Strategy: calculate in PDF point space (Y-up, origin bottom-left) — the
+ * same formulas as calculateWatermarkPositions in pdfProcessor.ts — then
+ * convert to SVG canvas pixels (Y-down, origin top-left).
+ */
+function computeWatermarkPositions(
+    watermark: WatermarkSettings,
+    cw: number,
+    ch: number,
+): Array<{ x: number; y: number }> {
+    // PDF page dimensions in points
+    const pageW = cw / RENDER_SCALE;
+    const pageH = ch / RENDER_SCALE;
+    const ptFontSize = watermark.fontSize;
+    const ptMargin = 50;
+
+    // Rough per-char width estimate in points (CJK ≈ 1em, Latin ≈ 0.6em)
+    const ptTextW = watermark.text.split('').reduce(
+        (sum, c) => sum + (c.charCodeAt(0) > 0xFF ? ptFontSize : ptFontSize * 0.6), 0,
+    );
+    const ptTextH = ptFontSize;
+
+    // Calculate positions in PDF space (Y-up) — mirrors pdfProcessor.ts
+    let pdfPositions: Array<{ x: number; y: number }>;
+
+    if (watermark.position === 'tile' && watermark.tileSettings) {
+        const { horizontalSpacing, verticalSpacing, offsetAlternateRows } = watermark.tileSettings;
+        const extra = Math.max(ptTextW, ptTextH);
+        pdfPositions = [];
+        let row = 0;
+        for (let y = -extra; y < pageH + extra; y += verticalSpacing) {
+            const ox = (offsetAlternateRows && row % 2 === 1) ? horizontalSpacing / 2 : 0;
+            for (let x = -extra + ox; x < pageW + extra; x += horizontalSpacing) {
+                pdfPositions.push({ x, y });
+            }
+            row++;
+        }
+        pdfPositions = pdfPositions.slice(0, 200);
+    } else {
+        let x: number, y: number;
+        switch (watermark.position) {
+            case 'top-left':
+                x = ptMargin;
+                y = pageH - ptMargin - ptTextH;
+                break;
+            case 'top-right':
+                x = pageW - ptTextW - ptMargin;
+                y = pageH - ptMargin - ptTextH;
+                break;
+            case 'bottom-left':
+                x = ptMargin;
+                y = ptMargin;
+                break;
+            case 'bottom-right':
+                x = pageW - ptTextW - ptMargin;
+                y = ptMargin;
+                break;
+            case 'center':
+            default:
+                x = (pageW - ptTextW) / 2;
+                y = (pageH - ptTextH) / 2;
+                break;
+        }
+        pdfPositions = [{ x, y }];
+    }
+
+    // Convert PDF (Y-up, origin bottom-left) → SVG canvas (Y-down, origin top-left)
+    return pdfPositions.map(({ x, y }) => ({
+        x: x * RENDER_SCALE,
+        y: (pageH - y) * RENDER_SCALE,
+    }));
+}
+
+/** Map WatermarkFontFamily to CSS font-family with appropriate fallbacks. */
+function cssFontFamily(fontFamily: WatermarkSettings['fontFamily']): string {
+    switch (fontFamily) {
+        case 'Noto Sans TC':
+            return '"Noto Sans TC", "Microsoft JhengHei", sans-serif';
+        case 'Times-Roman':
+            return '"Times New Roman", serif';
+        case 'Courier':
+            return '"Courier New", monospace';
+        case 'Helvetica':
+        default:
+            return 'Helvetica, Arial, sans-serif';
+    }
 }
 
 export function PageCard({
@@ -17,6 +112,7 @@ export function PageCard({
     logoSize,
     onClick,
     isSelected = false,
+    watermark,
 }: PageCardProps) {
     const { detection, skipLogo } = page;
 
@@ -78,6 +174,14 @@ export function PageCard({
         height: `${(scaledHeight / canvasHeight) * 100}%`,
     };
 
+    // Watermark preview positions
+    const wmEnabled = watermark?.enabled && !!watermark.text.trim();
+    const wmFontSize = wmEnabled ? watermark!.fontSize * RENDER_SCALE : 0;
+    const wmPositions = useMemo(() => {
+        if (!wmEnabled) return [];
+        return computeWatermarkPositions(watermark!, canvasWidth, canvasHeight);
+    }, [wmEnabled, watermark, canvasWidth, canvasHeight]);
+
     return (
         <div
             onClick={onClick}
@@ -109,6 +213,31 @@ export function PageCard({
                             style={{ opacity: effectiveOpacity / 100 }}
                         />
                     </div>
+                )}
+
+                {/* Watermark preview overlay */}
+                {wmEnabled && wmPositions.length > 0 && (
+                    <svg
+                        viewBox={`0 0 ${canvasWidth} ${canvasHeight}`}
+                        className="absolute inset-0 w-full h-full pointer-events-none"
+                        aria-hidden="true"
+                    >
+                        {wmPositions.map((pos, i) => (
+                            <text
+                                key={i}
+                                x={pos.x}
+                                y={pos.y}
+                                fontSize={wmFontSize}
+                                fill={watermark!.color}
+                                opacity={watermark!.opacity / 100}
+                                textAnchor="start"
+                                transform={`rotate(${-watermark!.rotation}, ${pos.x}, ${pos.y})`}
+                                style={{ fontFamily: cssFontFamily(watermark!.fontFamily) }}
+                            >
+                                {watermark!.text}
+                            </text>
+                        ))}
+                    </svg>
                 )}
             </div>
 

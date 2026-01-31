@@ -175,7 +175,7 @@ function validateWatermarkSettings(value: unknown): value is WatermarkSettings {
     if (!value || typeof value !== 'object') return false;
     const v = value as WatermarkSettings;
 
-    const validFonts: WatermarkFontFamily[] = ['Helvetica', 'Times-Roman', 'Courier'];
+    const validFonts: WatermarkFontFamily[] = ['Helvetica', 'Times-Roman', 'Courier', 'Noto Sans TC'];
     const validPositions: WatermarkPosition[] = ['center', 'top-left', 'top-right', 'bottom-left', 'bottom-right', 'tile'];
 
     // 基本欄位驗證
@@ -202,7 +202,7 @@ function validateHeaderFooterRow(value: unknown): value is HeaderFooterRow {
     if (!value || typeof value !== 'object') return false;
     const r = value as HeaderFooterRow;
 
-    const validFonts: WatermarkFontFamily[] = ['Helvetica', 'Times-Roman', 'Courier'];
+    const validFonts: WatermarkFontFamily[] = ['Helvetica', 'Times-Roman', 'Courier', 'Noto Sans TC'];
 
     // 基本欄位驗證
     if (typeof r.enabled !== 'boolean') return false;

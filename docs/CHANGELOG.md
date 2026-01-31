@@ -9,6 +9,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- **CJK 浮水印字型支援** - 中文浮水印文字正確渲染
+  - 新增 `Noto Sans TC` 字型選項至 `WatermarkFontFamily` 類型
+  - 新增 `fontLoader.ts` — CJK 字型載入器（三層備援：jsdelivr CDN → GitHub raw → Google Fonts API text subset）
+  - 輸入中文時自動切換至 Noto Sans TC（可手動覆蓋）
+  - Latin-only 字型搭配中文文字時顯示 amber 警告
+  - CJK 字型使用 `subset: false` 嵌入（fontkit v1.x subsetting 會破壞 CJK 字形）
+  - 新增 `pdf-lib-fontkit.d.ts` 類型宣告
+  - 更新依賴：新增 `@pdf-lib/fontkit`
+
+### Fixed
+- **浮水印預覽與 PDF 輸出不一致** - 4 項 bug 修正
+  - **SVG 文字錨點不一致**：預覽使用 `text-anchor="middle"` + `dominant-baseline="central"`，PDF 使用 baseline-start (左下角)。統一改為 `text-anchor="start"`
+  - **預覽位置公式與 PDF 不同**：預覽直接在 SVG canvas 空間計算；修正為先在 PDF 點空間（Y 向上）計算再轉換到 SVG（Y 向下），與 `calculateWatermarkPositions` 同步
+  - **旋轉頁面座標轉換錯誤**：`drawWatermarkOnPage` 的 case 90 和 270 的 Visual→MediaBox 座標轉換有誤，已修正為與 `drawHeaderFooterRowOnPage` 一致的公式
+  - **旋轉頁面浮水印角度未補償**：`rotate: degrees(watermark.rotation)` 改為 `degrees(watermark.rotation + rotation)`，使浮水印在旋轉頁面上呈現正確的視覺角度
+
 - **Logo Panel (右側面板)** - 多 Logo 管理功能
   - 畫面右側新增 Logo 面板，支援最多 4 個 Logo 插槽
   - 使用者可上傳、刪除、替換各個 Logo

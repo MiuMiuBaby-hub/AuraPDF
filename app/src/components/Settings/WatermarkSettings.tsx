@@ -1,6 +1,8 @@
+import { useEffect, useRef } from 'react';
 import { Droplets, RotateCcw, RotateCw } from 'lucide-react';
 import { DEFAULT_WATERMARK_SETTINGS } from '../../utils/settingsStorage';
 import type { WatermarkSettings as WatermarkSettingsType, WatermarkFontFamily, WatermarkPosition } from '../../types';
+import { containsNonWinAnsiChars } from '../../utils/fontLoader';
 
 interface WatermarkSettingsProps {
     watermark: WatermarkSettingsType;
@@ -15,6 +17,7 @@ const FONT_OPTIONS: { value: WatermarkFontFamily; label: string }[] = [
     { value: 'Helvetica', label: 'Helvetica' },
     { value: 'Times-Roman', label: 'Times Roman' },
     { value: 'Courier', label: 'Courier' },
+    { value: 'Noto Sans TC', label: 'Noto Sans TC（中文）' },
 ];
 
 // 位置選項
@@ -30,11 +33,27 @@ const POSITION_OPTIONS: { value: WatermarkPosition; label: string }[] = [
 // 預設顏色
 const PRESET_COLORS = ['#888888', '#FF0000', '#0066CC', '#000000'];
 
+// Latin-only 字型（無法顯示中文）
+const LATIN_ONLY_FONTS: WatermarkFontFamily[] = ['Helvetica', 'Times-Roman', 'Courier'];
+
 export function WatermarkSettings({ watermark, onWatermarkChange }: WatermarkSettingsProps) {
+    const userManuallySelectedFont = useRef(false);
+
     // 輔助更新函數
     const update = (updates: Partial<WatermarkSettingsType>) => {
         onWatermarkChange({ ...watermark, ...updates });
     };
+
+    // 當文字包含中文且字型為 Latin-only 時，自動切換至 Noto Sans TC
+    useEffect(() => {
+        if (userManuallySelectedFont.current) {
+            userManuallySelectedFont.current = false;
+            return;
+        }
+        if (watermark.text && containsNonWinAnsiChars(watermark.text) && LATIN_ONLY_FONTS.includes(watermark.fontFamily)) {
+            onWatermarkChange({ ...watermark, fontFamily: 'Noto Sans TC' });
+        }
+    }, [watermark.text]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const updateTile = (updates: Partial<WatermarkSettingsType['tileSettings']>) => {
         onWatermarkChange({
@@ -130,7 +149,10 @@ export function WatermarkSettings({ watermark, onWatermarkChange }: WatermarkSet
                             <label className="text-xs text-gray-300 block mb-1">字型</label>
                             <select
                                 value={watermark.fontFamily}
-                                onChange={(e) => update({ fontFamily: e.target.value as WatermarkFontFamily })}
+                                onChange={(e) => {
+                                    userManuallySelectedFont.current = true;
+                                    update({ fontFamily: e.target.value as WatermarkFontFamily });
+                                }}
                                 className="w-full bg-white/10 border border-white/20 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-cyan-400"
                             >
                                 {FONT_OPTIONS.map((f) => (
@@ -139,6 +161,11 @@ export function WatermarkSettings({ watermark, onWatermarkChange }: WatermarkSet
                                     </option>
                                 ))}
                             </select>
+                            {watermark.text && containsNonWinAnsiChars(watermark.text) && LATIN_ONLY_FONTS.includes(watermark.fontFamily) && (
+                                <p className="text-[10px] text-amber-400 mt-1">
+                                    ⚠ 此字型不支援中文，PDF 輸出可能出現亂碼
+                                </p>
+                            )}
                         </div>
 
                         {/* 字體大小 */}
@@ -221,7 +248,8 @@ export function WatermarkSettings({ watermark, onWatermarkChange }: WatermarkSet
                         <div className="bg-white rounded p-3 flex items-center justify-center min-h-[60px] overflow-hidden">
                             <span
                                 style={{
-                                    fontFamily: watermark.fontFamily === 'Times-Roman' ? 'Times New Roman, serif' :
+                                    fontFamily: watermark.fontFamily === 'Noto Sans TC' ? '"Noto Sans TC", "Microsoft JhengHei", sans-serif' :
+                                               watermark.fontFamily === 'Times-Roman' ? 'Times New Roman, serif' :
                                                watermark.fontFamily === 'Courier' ? 'Courier New, monospace' :
                                                'Helvetica, Arial, sans-serif',
                                     fontSize: `${Math.min(watermark.fontSize, 24)}px`,
