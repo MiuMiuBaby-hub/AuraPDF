@@ -649,7 +649,7 @@ export async function processPdfWithLogos(
         pdfDoc.registerFontkit(fontkit);
         const cjkFontBytes = await loadCjkFont(textsToCheck);
         console.info(`[Watermark] CJK font loaded: ${cjkFontBytes.byteLength} bytes`);
-        // Use subset: false — fontkit v1.x subsetting can corrupt CJK glyphs
+        // Font is pre-subsetted by harfbuzzjs; subset: false prevents fontkit's buggy re-subsetting
         cjkFont = await pdfDoc.embedFont(cjkFontBytes, { subset: false });
     }
 

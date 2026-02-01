@@ -3,3 +3,8 @@ declare module '@pdf-lib/fontkit' {
     const fontkit: Fontkit;
     export default fontkit;
 }
+
+declare module 'harfbuzzjs/hb-subset.wasm?url' {
+    const url: string;
+    export default url;
+}
