@@ -9,6 +9,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- **Logo 設定啟用開關** - UI 一致性改進
+  - Logo 設定區塊新增「啟用」Toggle，與浮水印、頁首/頁尾、PDF 安全性區塊保持一致
+  - 關閉時隱藏所有 Logo 細部設定（大小、透明度、位置），僅顯示標題列
+  - 關閉時下載 PDF 不嵌入 Logo（浮水印、頁首/頁尾、加密仍正常套用）
+  - 狀態自動儲存至 localStorage
+  - 修改檔案：
+    - `settingsStorage.ts`：`UserSettings` 新增 `logoEnabled` 欄位 + 驗證 + 預設值 `true`
+    - `LogoSettings.tsx`：標題列右側新增 `啟用` Toggle（`peer-checked:bg-blue-500`）
+    - `App.tsx`：新增 `logoEnabled` 狀態、持久化、下載時條件傳入 `null` logo bytes
+
 - **CJK 浮水印字型支援** - 中文浮水印文字正確渲染
   - 新增 `Noto Sans TC` 字型選項至 `WatermarkFontFamily` 類型
   - 新增 `fontLoader.ts` — CJK 字型載入器（三層備援：jsdelivr CDN → GitHub raw → Google Fonts API text subset）

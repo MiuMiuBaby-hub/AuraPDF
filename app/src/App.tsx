@@ -63,6 +63,7 @@ function App() {
   const logoPreviewUrl = activeLogo?.previewUrl ?? null;
 
   // Settings - load from localStorage
+  const [logoEnabled, setLogoEnabled] = useState(() => loadSettings().logoEnabled);
   const [logoSize, setLogoSize] = useState(() => loadSettings().logoSize);
   const [logoOpacity, setLogoOpacity] = useState(() => loadSettings().logoOpacity);
   const [preferredPosition, setPreferredPosition] = useState<PositionName>(() => loadSettings().preferredPosition);
@@ -82,8 +83,8 @@ function App() {
 
   // Save settings to localStorage when they change
   useEffect(() => {
-    saveSettings({ logoSize, logoOpacity, preferredPosition, autoSize, autoSizePercent, autoFallback, fallbackPriority, watermark: watermarkSettings, headerFooter: headerFooterSettings });
-  }, [logoSize, logoOpacity, preferredPosition, autoSize, autoSizePercent, autoFallback, fallbackPriority, watermarkSettings, headerFooterSettings]);
+    saveSettings({ logoEnabled, logoSize, logoOpacity, preferredPosition, autoSize, autoSizePercent, autoFallback, fallbackPriority, watermark: watermarkSettings, headerFooter: headerFooterSettings });
+  }, [logoEnabled, logoSize, logoOpacity, preferredPosition, autoSize, autoSizePercent, autoFallback, fallbackPriority, watermarkSettings, headerFooterSettings]);
 
   // Processing state
   const [isProcessing, setIsProcessing] = useState(false);
@@ -412,8 +413,8 @@ function App() {
 
       const resultBytes = await processPdfWithLogos(
         freshPdfBytes,
-        freshLogoBytes,
-        activeLogo.mimeType,
+        logoEnabled ? freshLogoBytes : null,
+        logoEnabled ? activeLogo.mimeType : null,
         processedPages,
         logoOpacity,
         activeLogo.dimensions,
@@ -440,7 +441,7 @@ function App() {
     } finally {
       setIsDownloading(false);
     }
-  }, [activeLogo, pdfFile, processedPages, logoOpacity, securitySettings, watermarkSettings, headerFooterSettings]);
+  }, [activeLogo, pdfFile, processedPages, logoEnabled, logoOpacity, securitySettings, watermarkSettings, headerFooterSettings]);
 
   // Handle back
   const handleBack = useCallback(() => {
@@ -618,8 +619,8 @@ function App() {
 
         const resultBytes = await processPdfWithLogos(
           freshPdfBytes,
-          freshLogoBytes,
-          activeLogo.mimeType,
+          logoEnabled ? freshLogoBytes : null,
+          logoEnabled ? activeLogo.mimeType : null,
           bf.processedPages!,
           logoOpacity,
           activeLogo.dimensions,
@@ -664,7 +665,7 @@ function App() {
     setIsBatchProcessing(false);
     setBatchProgress(null);
     setCurrentStep('download');
-  }, [activeLogo, batchFiles, logoOpacity, securitySettings, watermarkSettings, headerFooterSettings]);
+  }, [activeLogo, batchFiles, logoEnabled, logoOpacity, securitySettings, watermarkSettings, headerFooterSettings]);
 
   // Get status counts
   const statusCounts = {
@@ -765,11 +766,13 @@ function App() {
             {activeLogo && (
               <>
                 <LogoSettings
+                  logoEnabled={logoEnabled}
                   logoSize={logoSize}
                   logoOpacity={logoOpacity}
                   preferredPosition={preferredPosition}
                   autoSize={autoSize}
                   autoSizePercent={autoSizePercent}
+                  onEnabledChange={setLogoEnabled}
                   onSizeChange={setLogoSize}
                   onOpacityChange={setLogoOpacity}
                   onPositionChange={setPreferredPosition}

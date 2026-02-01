@@ -2,6 +2,7 @@ import type { PositionName, SecuritySettings, WatermarkSettings, WatermarkFontFa
 
 // Settings that can be persisted
 export interface UserSettings {
+    logoEnabled: boolean;        // 是否啟用 Logo
     logoSize: number;
     logoOpacity: number;
     preferredPosition: PositionName;
@@ -64,6 +65,7 @@ export const DEFAULT_HEADER_FOOTER_SETTINGS: HeaderFooterSettings = {
 
 // Default settings
 export const DEFAULT_SETTINGS: UserSettings = {
+    logoEnabled: true,
     logoSize: 80,
     logoOpacity: 100,
     preferredPosition: 'right-bottom',
@@ -103,6 +105,7 @@ export function loadSettings(): UserSettings {
 
         // Validate and merge with defaults
         return {
+            logoEnabled: typeof parsed.logoEnabled === 'boolean' ? parsed.logoEnabled : DEFAULT_SETTINGS.logoEnabled,
             logoSize: validateLogoSize(parsed.logoSize) ? parsed.logoSize : DEFAULT_SETTINGS.logoSize,
             logoOpacity: validateLogoOpacity(parsed.logoOpacity) ? parsed.logoOpacity : DEFAULT_SETTINGS.logoOpacity,
             preferredPosition: validatePosition(parsed.preferredPosition) ? parsed.preferredPosition : DEFAULT_SETTINGS.preferredPosition,

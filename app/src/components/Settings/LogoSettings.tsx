@@ -4,11 +4,13 @@ import { PositionSelector } from './PositionSelector';
 import type { PositionName } from '../../types';
 
 interface LogoSettingsProps {
+    logoEnabled: boolean;
     logoSize: number;
     logoOpacity: number;
     preferredPosition: PositionName;
     autoSize: boolean;
     autoSizePercent: number;
+    onEnabledChange: (enabled: boolean) => void;
     onSizeChange: (size: number) => void;
     onOpacityChange: (opacity: number) => void;
     onPositionChange: (position: PositionName) => void;
@@ -39,11 +41,13 @@ const isDefault = (
     JSON.stringify(fallbackPriority) === JSON.stringify(DEFAULT_SETTINGS.fallbackPriority);
 
 export function LogoSettings({
+    logoEnabled,
     logoSize,
     logoOpacity,
     preferredPosition,
     autoSize,
     autoSizePercent,
+    onEnabledChange,
     onSizeChange,
     onOpacityChange,
     onPositionChange,
@@ -63,27 +67,42 @@ export function LogoSettings({
                     <h3 className="text-sm font-semibold text-white">Logo 設定</h3>
                     <span className="text-xs text-gray-500">自動儲存</span>
                 </div>
-                {!isDefault(logoSize, logoOpacity, preferredPosition, autoSize, autoSizePercent, autoFallback, fallbackPriority) && (
-                    <button
-                        onClick={() => {
-                            onSizeChange(DEFAULT_SETTINGS.logoSize);
-                            onOpacityChange(DEFAULT_SETTINGS.logoOpacity);
-                            onPositionChange(DEFAULT_SETTINGS.preferredPosition);
-                            onAutoSizeChange(DEFAULT_SETTINGS.autoSize);
-                            onAutoSizePercentChange(DEFAULT_SETTINGS.autoSizePercent);
-                            onAutoFallbackChange(DEFAULT_SETTINGS.autoFallback);
-                            onFallbackPriorityChange(DEFAULT_SETTINGS.fallbackPriority);
-                        }}
-                        className="flex items-center gap-1 text-xs text-gray-400 hover:text-white transition-colors"
-                        title="重置為預設值"
-                    >
-                        <RotateCcw className="w-3 h-3" />
-                        重置
-                    </button>
-                )}
+                <div className="flex items-center gap-3">
+                    {!isDefault(logoSize, logoOpacity, preferredPosition, autoSize, autoSizePercent, autoFallback, fallbackPriority) && (
+                        <button
+                            onClick={() => {
+                                onSizeChange(DEFAULT_SETTINGS.logoSize);
+                                onOpacityChange(DEFAULT_SETTINGS.logoOpacity);
+                                onPositionChange(DEFAULT_SETTINGS.preferredPosition);
+                                onAutoSizeChange(DEFAULT_SETTINGS.autoSize);
+                                onAutoSizePercentChange(DEFAULT_SETTINGS.autoSizePercent);
+                                onAutoFallbackChange(DEFAULT_SETTINGS.autoFallback);
+                                onFallbackPriorityChange(DEFAULT_SETTINGS.fallbackPriority);
+                            }}
+                            className="flex items-center gap-1 text-xs text-gray-400 hover:text-white transition-colors"
+                            title="重置為預設值"
+                        >
+                            <RotateCcw className="w-3 h-3" />
+                            重置
+                        </button>
+                    )}
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                        <span className="text-xs text-gray-400">啟用</span>
+                        <div className="relative">
+                            <input
+                                type="checkbox"
+                                checked={logoEnabled}
+                                onChange={(e) => onEnabledChange(e.target.checked)}
+                                className="sr-only peer"
+                            />
+                            <div className="w-9 h-5 bg-gray-600 rounded-full peer peer-checked:bg-blue-500 transition-colors" />
+                            <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4" />
+                        </div>
+                    </label>
+                </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            {logoEnabled && <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                 {/* Column 1: Logo 大小 */}
                 <div className="space-y-1 sm:pr-6 sm:border-r sm:border-white/10">
                     <div className="flex justify-between items-center">
@@ -192,7 +211,7 @@ export function LogoSettings({
                     fallbackPriority={fallbackPriority}
                     onFallbackPriorityChange={onFallbackPriorityChange}
                 />
-            </div>
+            </div>}
         </div>
     );
 }
